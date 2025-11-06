@@ -1,5 +1,9 @@
 <template>
-  <BaseBadge variant="metro" :size="size" custom-class="gap-2">
+  <BaseBadge
+    variant="metro"
+    :size="size"
+    custom-class="gap-2"
+  >
     <div 
       class="w-2 h-2 rounded-full shrink-0"
       :style="{ backgroundColor: metroLineColor }"

@@ -177,7 +177,7 @@ watch(filters, (newFilters) => {
 <style scoped>
 .filters-panel {
   @apply flex flex-col items-start overflow-hidden rounded-xl 
-         backdrop-blur-[30px] bg-surface-glass-light w-full;
+         backdrop-blur-[30px] bg-surface-glass-light w-full pointer-events-auto;
 }
 
 .features-grid {

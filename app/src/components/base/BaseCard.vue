@@ -37,7 +37,7 @@ const props = defineProps({
 })
 
 const cardClasses = computed(() => {
-  const classes = []
+  const classes = ['pointer-events-auto']
   
   // Hover эффект
   if (props.hoverable) {

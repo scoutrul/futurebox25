@@ -1,34 +1,31 @@
 <template>
   <div class="app-container">
-    <TopBarGuest />
+    <!-- Карта как фон на весь экран -->
+    <BuildingMap class="map-background" :building="buildingData" />
     
-    <!-- Демонстрация компонентов -->
-    <BaseContainer custom-class="demo-section">
-      <!-- Панель фильтров -->
-      <FiltersPanel
-        :price-range="filterRanges.price"
-        :area-range="filterRanges.area"
-        :floor-range="filterRanges.floor"
-        :rooms-options="roomsOptions"
-        :features-options="featuresOptions"
-        @filter-change="handleFilterChange"
-        @reset="handleFilterReset"
-      />
+    <!-- Контент поверх карты -->
+    <div class="content-overlay">
+      <TopBarGuest />
       
-      <!-- Панель здания -->
-      <BuildingPanel
-        :building="buildingData"
-        :apartments="apartmentsData"
-        @call-request="handleCallRequest"
-        @view-all="handleViewAll"
-      />
-    </BaseContainer>
+      <!-- Демонстрация компонентов -->
+      <BaseContainer custom-class="demo-section">
+        <!-- Панель фильтров -->
+        <FiltersPanel :price-range="filterRanges.price" :area-range="filterRanges.area"
+        :floor-range="filterRanges.floor" :rooms-options="roomsOptions" :features-options="featuresOptions"
+        @filter-change="handleFilterChange" @reset="handleFilterReset" />
+
+        <!-- Панель здания -->
+        <BuildingPanel :building="buildingData" :apartments="apartmentsData" @call-request="handleCallRequest"
+        @view-all="handleViewAll" />
+      </BaseContainer>
+    </div>
   </div>
 </template>
 
 <script setup>
 import TopBarGuest from './components/TopBarGuest.vue'
 import BuildingPanel from './components/BuildingPanel.vue'
+import BuildingMap from './components/BuildingMap.vue'
 import FiltersPanel from './components/FiltersPanel.vue'
 import { BaseContainer } from './components/base'
 import { buildingMockData, apartmentsMockData } from './mocks/buildingData'
@@ -61,16 +58,34 @@ const handleFilterReset = () => {
 
 <style>
 body {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 #app {
-  width: 100%;
+  width: 100vw;
+  height: 100vh;
 }
 
 .app-container {
-  @apply flex flex-col gap-8 pb-8;
+  @apply relative w-full h-full;
+}
+
+/* Карта как фон на весь экран */
+.map-background {
+  @apply fixed inset-0;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 0;
+}
+
+/* Контент поверх карты */
+.content-overlay {
+  @apply relative flex flex-col gap-8 pb-8 overflow-y-auto;
+  min-height: 100vh;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .demo-section {

@@ -56,7 +56,7 @@ const handleRequestClick = () => {
 <style scoped>
 /* Mobile-first: базовые стили для мобильных устройств */
 .top-bar {
-  @apply flex flex-col items-center justify-between gap-5;
+  @apply flex flex-col items-center justify-between gap-5 pointer-events-auto;
 }
 
 .logo-section {
