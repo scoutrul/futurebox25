@@ -49,8 +49,8 @@ const cardClasses = computed(() => {
     none: '',
     sm: 'p-4',
     md: 'px-16 py-6',
-    lg: 'px-20 py-8',
-    xl: 'px-24 py-10'
+    lg: 'px-16 py-6',
+    xl: 'px-16 py-6'
   }
   classes.push(paddingMap[props.padding])
   

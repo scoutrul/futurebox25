@@ -31,8 +31,12 @@ module.exports = {
         surface: {
           glass: 'rgba(255, 255, 255, 0.6)',
           'glass-dark': 'rgba(255, 255, 255, 0.1)',
+          'glass-light': 'rgba(255, 255, 255, 0.5)',
           'glass-green': 'rgba(42, 150, 72, 0.5)',
           white: '#FFFFFF',
+        },
+        border: {
+          light: '#e6e6e6',
         }
       },
       fontFamily: {

@@ -5,4 +5,7 @@ export { default as BaseButton } from './BaseButton.vue'
 export { default as BaseContainer } from './BaseContainer.vue'
 export { default as BaseBadge } from './BaseBadge.vue'
 export { default as MetroBadge } from './MetroBadge.vue'
+export { default as ButtonGroup } from './ButtonGroup.vue'
+export { default as RangeSlider } from './RangeSlider.vue'
+export { default as FilterSection } from './FilterSection.vue'
 

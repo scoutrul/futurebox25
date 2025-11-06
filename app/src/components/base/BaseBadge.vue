@@ -42,7 +42,7 @@ const badgeClasses = computed(() => {
     'justify-center',
     'gap-2',
     'rounded-full',
-    'backdrop-blur-[30px]',
+    'glass',
     'font-sans',
     'font-normal',
     'tracking-[-0.39px]',

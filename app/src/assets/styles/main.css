@@ -15,9 +15,30 @@
 
 /* Компонентные стили с @apply */
 @layer components {
+  /* Glassmorphism эффекты - переиспользуемые */
+  .glass {
+    @apply backdrop-blur-[30px];
+  }
+  
+  .glass-default {
+    @apply backdrop-blur-[30px] bg-surface-glass;
+  }
+  
+  .glass-light {
+    @apply backdrop-blur-[30px] bg-surface-glass-light;
+  }
+  
+  .glass-dark {
+    @apply backdrop-blur-[30px] bg-surface-glass-dark;
+  }
+  
+  .glass-green {
+    @apply backdrop-blur-[30px] bg-surface-glass-green;
+  }
+  
   /* Карточка с glassmorphism эффектом */
   .card-glass {
-    @apply bg-surface-glass backdrop-blur-glass rounded-card shadow-card;
+    @apply backdrop-blur-[30px] bg-surface-glass rounded-card shadow-card;
   }
   
   .card-glass-hover {
@@ -59,8 +80,8 @@
 
 /* Утилиты */
 @layer utilities {
-  .glass-effect {
-    backdrop-filter: blur(30px);
+  /* Дополнительная поддержка для старых браузеров */
+  .backdrop-blur-\[30px\] {
     -webkit-backdrop-filter: blur(30px);
   }
 }

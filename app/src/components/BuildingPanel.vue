@@ -75,7 +75,7 @@ const handleViewAll = () => {
 <style scoped>
 .building-panel {
   @apply flex flex-col items-start overflow-hidden rounded-xl 
-         shadow-[0px_12px_24px_0px_rgba(0,0,0,0.15)] bg-neutral-space w-full;
+         shadow-[0px_12px_24px_0px_rgba(0,0,0,0.15)] bg-neutral-space w-full max-h-[fit-content];
 }
 
 .apartments-list {
