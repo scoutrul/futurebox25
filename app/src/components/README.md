@@ -10,12 +10,22 @@ components/
 │   ├── BaseButton.vue      # Кнопки
 │   ├── BaseContainer.vue   # Контейнер-лейаут
 │   ├── BaseBadge.vue       # Badge компонент
-│   └── MetroBadge.vue      # Badge для метро
-├── TopBarGuest.vue         # Шапка сайта
-├── BuildingPanel.vue       # Панель здания (главный компонент)
-├── BuildingHeader.vue      # Заголовок здания с информацией
-├── ApartmentTabs.vue       # Табы фильтрации квартир
-└── ApartmentCard.vue       # Карточка квартиры
+│   ├── MetroBadge.vue      # Badge для метро
+│   ├── ButtonGroup.vue     # Группа кнопок
+│   ├── RangeSlider.vue     # Ползунок диапазона
+│   └── FilterSection.vue   # Секция фильтра
+├── building/               # Компоненты здания
+│   ├── BuildingPanel.vue   # Панель здания (главный компонент)
+│   ├── BuildingHeader.vue  # Заголовок здания с информацией
+│   └── BuildingMap.vue     # Карта здания
+├── apartments/             # Компоненты квартир
+│   ├── ApartmentCard.vue   # Карточка квартиры
+│   └── ApartmentTabs.vue   # Табы фильтрации квартир
+├── layout/                 # Компоненты интерфейса и разметки
+│   └── TopBarGuest.vue     # Шапка сайта
+├── filters/                # Компоненты фильтров
+│   └── FiltersPanel.vue    # Панель фильтров
+└── README.md               # Документация
 ```
 
 ## Примеры использования
@@ -35,7 +45,7 @@ components/
 </template>
 
 <script setup>
-import BuildingPanel from '@/components/BuildingPanel.vue'
+import BuildingPanel from '@/components/building/BuildingPanel.vue'
 import { buildingMockData, apartmentsMockData } from '@/mocks/buildingData'
 
 const buildingData = buildingMockData

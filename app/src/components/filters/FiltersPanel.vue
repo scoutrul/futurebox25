@@ -83,7 +83,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { FilterSection, ButtonGroup, RangeSlider, BaseBadge, BaseText } from './base'
+import { FilterSection, ButtonGroup, RangeSlider, BaseBadge, BaseText } from '../base'
 
 const props = defineProps({
   /**

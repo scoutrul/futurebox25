@@ -33,9 +33,9 @@
 
 <script setup>
 import { computed } from 'vue'
-import { BaseCard, BaseText, BaseButton, BaseContainer } from './base'
+import { BaseCard, BaseText, BaseButton, BaseContainer } from '../base'
 import { useBreakpoints } from '@/composables/useBreakpoints'
-import logoSrc from '../assets/logo.svg'
+import logoSrc from '../../assets/logo.svg'
 
 // Определение размера экрана через composable (mobile-first)
 const { isTablet, isDesktop } = useBreakpoints()

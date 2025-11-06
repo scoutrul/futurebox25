@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { BaseText, BaseBadge, BaseButton, MetroBadge } from './base'
+import { BaseText, BaseBadge, BaseButton, MetroBadge } from '../base'
 
 defineProps({
   /**

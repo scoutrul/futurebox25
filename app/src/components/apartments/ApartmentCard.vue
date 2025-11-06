@@ -54,7 +54,7 @@
 </template>
 
 <script setup>
-import { BaseText, BaseBadge } from './base'
+import { BaseText, BaseBadge } from '../base'
 
 defineProps({
   /**

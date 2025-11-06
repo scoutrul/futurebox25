@@ -23,10 +23,10 @@
 </template>
 
 <script setup>
-import TopBarGuest from './components/TopBarGuest.vue'
-import BuildingPanel from './components/BuildingPanel.vue'
-import BuildingMap from './components/BuildingMap.vue'
-import FiltersPanel from './components/FiltersPanel.vue'
+import TopBarGuest from './components/layout/TopBarGuest.vue'
+import BuildingPanel from './components/building/BuildingPanel.vue'
+import BuildingMap from './components/building/BuildingMap.vue'
+import FiltersPanel from './components/filters/FiltersPanel.vue'
 import { BaseContainer } from './components/base'
 import { buildingMockData, apartmentsMockData } from './mocks/buildingData'
 import { filterRanges, roomsOptions, featuresOptions } from './mocks/filtersData'

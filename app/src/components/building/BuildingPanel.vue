@@ -27,8 +27,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import BuildingHeader from './BuildingHeader.vue'
-import ApartmentTabs from './ApartmentTabs.vue'
-import ApartmentCard from './ApartmentCard.vue'
+import ApartmentTabs from '../apartments/ApartmentTabs.vue'
+import ApartmentCard from '../apartments/ApartmentCard.vue'
 
 const props = defineProps({
   /**
