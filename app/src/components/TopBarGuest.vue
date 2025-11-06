@@ -1,160 +1,111 @@
 <template>
-  <div class="top-bar-container">
-    <div class="top-bar">
+  <BaseContainer>
+    <BaseCard 
+      :padding="cardPadding"
+      custom-class="top-bar"
+    >
       <div class="logo-section">
         <img 
-          src="../assets/logo.svg" 
+          :src="logoSrc" 
           alt="Futurebox" 
           class="logo"
         >
-        <p class="tagline">
+        <BaseText 
+          variant="tagline"
+          :nowrap="isTablet || isDesktop"
+        >
           Технологии будущего дома
-        </p>
+        </BaseText>
       </div>
       
       <div class="actions">
-        <button 
-          class="btn-primary"
+        <BaseButton 
+          variant="primary"
+          :block="!isTablet && !isDesktop"
           @click="handleRequestClick"
         >
           Отправить запрос
-        </button>
+        </BaseButton>
       </div>
-    </div>
-  </div>
+    </BaseCard>
+  </BaseContainer>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { BaseCard, BaseText, BaseButton, BaseContainer } from './base'
+import { useBreakpoints } from '@/composables/useBreakpoints'
+import logoSrc from '../assets/logo.svg'
+
+// Определение размера экрана через composable (mobile-first)
+const { isTablet, isDesktop } = useBreakpoints()
+
+// Адаптивный padding для карточки (mobile-first)
+const cardPadding = computed(() => {
+  if (isDesktop.value) return 'lg'
+  if (isTablet.value) return 'md'
+  return 'sm' // по умолчанию для мобильных
+})
+
 const handleRequestClick = () => {
   // Логика отправки запроса
-  console.log('Запрос отправлен');
-};
+  console.log('Запрос отправлен')
+}
 </script>
 
 <style scoped>
-.top-bar-container {
-  padding: 32px 64px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
+/* Mobile-first: базовые стили для мобильных устройств */
 .top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 64px;
-  padding: 24px 64px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border-radius: 12px;
-  box-sizing: border-box;
-  width: 100%;
+  @apply flex flex-col items-center justify-between gap-5;
 }
 
 .logo-section {
-  display: flex;
-  align-items: center;
-  gap: 64px;
-  flex: 1;
+  @apply flex flex-col items-center gap-3 w-full text-center;
 }
 
 .logo {
-  width: 158px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.tagline {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.6;
-  color: #444444;
-  margin: 0;
-  white-space: nowrap;
+  @apply w-[120px] h-5;
 }
 
 .actions {
-  display: flex;
-  align-items: center;
-  gap: 40px;
+  @apply w-full;
 }
 
-.btn-primary {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 12px 20px;
-  background: #2a9648;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.6;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn-primary:hover {
-  background: #248a3f;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(42, 150, 72, 0.3);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(42, 150, 72, 0.2);
-}
-
-.btn-primary:focus {
-  outline: 2px solid #2a9648;
-  outline-offset: 2px;
-}
-
-/* Адаптивность */
-@media (max-width: 1200px) {
-  .top-bar-container {
-    padding: 24px 32px;
-  }
-  
+/* Планшеты и выше (md: 768px+) */
+@media (min-width: 768px) {
   .top-bar {
-    padding: 20px 40px;
-    gap: 32px;
+    @apply flex-row gap-8;
   }
   
   .logo-section {
-    gap: 32px;
+    @apply flex-row text-left gap-8 flex-1;
+  }
+  
+  .logo {
+    @apply w-[140px] h-[22px] shrink-0;
+  }
+  
+  .actions {
+    @apply w-auto;
   }
 }
 
-@media (max-width: 768px) {
-  .top-bar-container {
-    padding: 16px 20px;
-  }
-  
+/* Десктоп (xl: 1200px+) */
+@media (min-width: 1200px) {
   .top-bar {
-    flex-direction: column;
-    padding: 16px 24px;
-    gap: 20px;
+    @apply gap-16;
   }
   
   .logo-section {
-    flex-direction: column;
-    gap: 12px;
-    text-align: center;
+    @apply gap-16;
   }
   
-  .tagline {
-    white-space: normal;
+  .logo {
+    @apply w-[158px] h-6;
   }
   
-  .btn-primary {
-    width: 100%;
-    justify-content: center;
+  .actions {
+    @apply gap-10;
   }
 }
 </style>

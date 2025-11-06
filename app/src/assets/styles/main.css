@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Базовые стили дизайн-системы */
+@layer base {
+  * {
+    @apply box-border;
+  }
+  
+  body {
+    @apply m-0 p-0 font-sans antialiased;
+  }
+}
+
+/* Компонентные стили с @apply */
+@layer components {
+  /* Карточка с glassmorphism эффектом */
+  .card-glass {
+    @apply bg-surface-glass backdrop-blur-glass rounded-card shadow-card;
+  }
+  
+  .card-glass-hover {
+    @apply transition-shadow duration-200 hover:shadow-card-hover;
+  }
+  
+  /* Кнопка - базовая */
+  .btn {
+    @apply inline-flex items-center justify-center gap-6 px-5 py-3 
+           font-sans text-[16px] leading-[1.6] rounded-button border-none cursor-pointer
+           transition-all duration-200 whitespace-nowrap
+           focus:outline focus:outline-2 focus:outline-offset-2;
+  }
+  
+  /* Кнопка - primary (акцентная) */
+  .btn-primary {
+    @apply btn bg-primary text-white
+           hover:bg-primary-dark hover:-translate-y-px hover:shadow-button-hover
+           active:translate-y-0 active:shadow-button
+           focus:outline-primary;
+  }
+  
+  /* Кнопка - secondary */
+  .btn-secondary {
+    @apply btn bg-white text-neutral-dark border border-neutral-dark
+           hover:bg-gray-50 hover:shadow-sm
+           active:bg-gray-100
+           focus:outline-neutral-dark;
+  }
+  
+  /* Кнопка - ghost */
+  .btn-ghost {
+    @apply btn bg-transparent text-neutral-dark
+           hover:bg-gray-100
+           active:bg-gray-200
+           focus:outline-neutral-dark;
+  }
+}
+
+/* Утилиты */
+@layer utilities {
+  .glass-effect {
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+  }
+}
+
