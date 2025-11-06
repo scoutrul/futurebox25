@@ -35,9 +35,9 @@
   /* Кнопка - primary (акцентная) */
   .btn-primary {
     @apply btn bg-primary text-white
-           hover:bg-primary-dark hover:-translate-y-px hover:shadow-button-hover
-           active:translate-y-0 active:shadow-button
-           focus:outline-primary;
+           hover:bg-primary-dark hover:shadow-button-hover
+           active:shadow-button
+           focus:outline-none;
   }
   
   /* Кнопка - secondary */
@@ -45,7 +45,7 @@
     @apply btn bg-white text-neutral-dark border border-neutral-dark
            hover:bg-gray-50 hover:shadow-sm
            active:bg-gray-100
-           focus:outline-neutral-dark;
+           focus:outline-none;
   }
   
   /* Кнопка - ghost */
@@ -53,7 +53,7 @@
     @apply btn bg-transparent text-neutral-dark
            hover:bg-gray-100
            active:bg-gray-200
-           focus:outline-neutral-dark;
+           focus:outline-none;
   }
 }
 

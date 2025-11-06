@@ -34,7 +34,7 @@ const props = defineProps({
   },
   /**
    * Цвет текста
-   * @values 'default', 'primary', 'space', 'dark', 'medium', 'light', 'white'
+   * @values 'default', 'primary', 'space', 'black', 'dark', 'dark-gray', 'gray', 'medium', 'light', 'white'
    */
   color: {
     type: String,
@@ -85,7 +85,10 @@ const textClasses = computed(() => {
     'default': 'text-neutral-dark',
     'primary': 'text-primary',
     'space': 'text-neutral-space',
+    'black': 'text-neutral-black',
     'dark': 'text-neutral-dark',
+    'dark-gray': 'text-neutral-dark-gray',
+    'gray': 'text-neutral-gray',
     'medium': 'text-neutral-medium',
     'light': 'text-neutral-light',
     'white': 'text-white',

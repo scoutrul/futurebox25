@@ -15,15 +15,23 @@ module.exports = {
         },
         accent: {
           green: '#2a9648',
+          'green-light': '#c1f9d0',
+          red: '#fc574d',
         },
         neutral: {
           space: '#1D1D1D',
+          black: '#151515',
           dark: '#444444',
+          'dark-gray': '#727272',
+          gray: '#a7a7a7',
           medium: '#666666',
-          light: '#999999',
+          light: '#f2f2f2',
+          lighter: '#999999',
         },
         surface: {
           glass: 'rgba(255, 255, 255, 0.6)',
+          'glass-dark': 'rgba(255, 255, 255, 0.1)',
+          'glass-green': 'rgba(42, 150, 72, 0.5)',
           white: '#FFFFFF',
         }
       },

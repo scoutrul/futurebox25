@@ -7,14 +7,25 @@
   - Dark: `#248a3f`
   - Light: `#34a854`
 
+### Акцентные цвета
+- **Green**: `#2a9648` - Основной зеленый
+- **Green Light**: `#c1f9d0` - Светло-зеленый для badges
+- **Red**: `#fc574d` - Красный (для линий метро)
+
 ### Нейтральные цвета
 - **Space**: `#1D1D1D` - Самый темный
-- **Dark**: `#444444` - Текст по умолчанию
-- **Medium**: `#666666`
-- **Light**: `#999999`
+- **Black**: `#151515` - Черный текст
+- **Dark**: `#444444` - Темно-серый
+- **Dark Gray**: `#727272` - Серый текст
+- **Gray**: `#a7a7a7` - Средне-серый
+- **Medium**: `#666666` - Серый
+- **Light**: `#f2f2f2` - Светло-серый фон
+- **Lighter**: `#999999` - Светлый серый
 
 ### Поверхности
-- **Glass**: `rgba(255, 255, 255, 0.6)` - Полупрозрачный фон с glassmorphism
+- **Glass**: `rgba(255, 255, 255, 0.6)` - Полупрозрачный светлый
+- **Glass Dark**: `rgba(255, 255, 255, 0.1)` - Полупрозрачный темный
+- **Glass Green**: `rgba(42, 150, 72, 0.5)` - Полупрозрачный зеленый
 - **White**: `#FFFFFF`
 
 ## 📝 Типографика
@@ -32,7 +43,18 @@
 
 ## 🎯 Компоненты
 
-### BaseCard
+### Базовые компоненты
+
+#### BaseContainer
+Адаптивный контейнер-лейаут с responsive отступами.
+
+**Props:**
+- `maxWidth` - максимальная ширина (full, screen-xl, screen-lg)
+- `padding` - горизонтальные отступы (responsive по умолчанию)
+- `paddingY` - вертикальные отступы
+- `center` - центрирование контента
+
+#### BaseCard
 Карточка с glassmorphism эффектом (размытие 30px, полупрозрачный фон).
 
 **Props:**
@@ -97,6 +119,85 @@
   Сохранить
 </BaseButton>
 \`\`\`
+
+#### BaseBadge
+Универсальный badge компонент для меток и тегов.
+
+**Props:**
+- `variant` - стиль (default, primary, secondary, success, metro)
+- `size` - размер (sm, md)
+
+**Варианты:**
+- `default` - полупрозрачный темный (для информации)
+- `primary` - зеленый полупрозрачный (для удобств)
+- `secondary` - светло-серый (для features)
+- `success` - светло-зеленый (для highlighted)
+
+**Использование:**
+\`\`\`vue
+<BaseBadge variant="default">от 12,5 млн</BaseBadge>
+<BaseBadge variant="primary">Паркинг</BaseBadge>
+<BaseBadge variant="secondary">Балкон</BaseBadge>
+<BaseBadge variant="success">3Д-план</BaseBadge>
+\`\`\`
+
+#### MetroBadge
+Специализированный badge для станций метро с цветом линии.
+
+**Props:**
+- `stationName` - название станции
+- `metroLineColor` - цвет линии метро (hex)
+- `walkTime` - время пешком (минуты)
+- `size` - размер (sm, md)
+
+**Использование:**
+\`\`\`vue
+<MetroBadge
+  station-name="Фрунзенская"
+  metro-line-color="#fc574d"
+  :walk-time="15"
+/>
+\`\`\`
+
+### Комплексные компоненты
+
+#### BuildingPanel
+Главный компонент панели здания с информацией и списком квартир.
+
+**Props:**
+- `building` - данные здания (объект)
+- `apartments` - массив квартир
+
+**События:**
+- `@call-request` - запрос звонка
+- `@view-all` - показать все квартиры
+
+**Использование:**
+\`\`\`vue
+<BuildingPanel
+  :building="buildingData"
+  :apartments="apartmentsData"
+  @call-request="handleCallRequest"
+  @view-all="handleViewAll"
+/>
+\`\`\`
+
+#### ApartmentCard
+Карточка квартиры с планом и характеристиками.
+
+**Props:**
+- `apartment` - данные квартиры (объект с rooms, area, description, features)
+
+#### ApartmentTabs
+Табы для фильтрации квартир по количеству комнат.
+
+**Props:**
+- `modelValue` - активный таб (v-model)
+- `roomTypes` - массив типов комнат [1, 2, 3, 4]
+
+**События:**
+- `@update:modelValue` - изменение таба
+- `@view-all` - показать все
 
 ## 🎭 Эффекты
 
