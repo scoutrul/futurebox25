@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+
     <!-- Карта как фон на весь экран -->
     <BuildingMap class="map-background" :building="buildingData" />
     
@@ -8,7 +8,7 @@
       <TopBarGuest />
       
       <!-- Демонстрация компонентов -->
-      <BaseContainer custom-class="demo-section">
+      <BaseContainer custom-class="demo-section" v-if="false">
         <!-- Панель фильтров -->
         <FiltersPanel :price-range="filterRanges.price" :area-range="filterRanges.area"
         :floor-range="filterRanges.floor" :rooms-options="roomsOptions" :features-options="featuresOptions"
@@ -19,13 +19,13 @@
         @view-all="handleViewAll" />
       </BaseContainer>
     </div>
-  </div>
+ 
 </template>
 
 <script setup>
-import TopBarGuest from './components/layout/TopBarGuest.vue'
+import TopBarGuest from './components/layout/TopBar.vue'
 import BuildingPanel from './components/building/BuildingPanel.vue'
-import BuildingMap from './components/building/BuildingMap.vue'
+import BuildingMap from './components/map/Map.vue'
 import FiltersPanel from './components/filters/FiltersPanel.vue'
 import { BaseContainer } from './components/base'
 import { buildingMockData, apartmentsMockData } from './mocks/buildingData'
@@ -66,9 +66,6 @@ body {
 #app {
   width: 100vw;
   height: 100vh;
-}
-
-.app-container {
   @apply relative w-full h-full;
 }
 
