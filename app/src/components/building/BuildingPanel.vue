@@ -1,5 +1,17 @@
 <template>
   <div class="building-panel">
+    <!-- Кнопка закрытия -->
+    <button 
+      type="button"
+      class="close-button"
+      @click.stop="handleClose"
+      aria-label="Закрыть панель"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    
     <!-- Головная часть с информацией о здании -->
     <BuildingHeader 
       :building="building"
@@ -47,7 +59,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['call-request', 'view-all'])
+const emit = defineEmits(['call-request', 'view-all', 'close'])
 
 // Выбранный тип комнат (по умолчанию 1-комнатные)
 const selectedRoomType = ref(1)
@@ -70,12 +82,27 @@ const handleCallRequest = () => {
 const handleViewAll = () => {
   emit('view-all', props.building)
 }
+
+const handleClose = () => {
+  console.log('BuildingPanel: handleClose вызван')
+  emit('close')
+}
 </script>
 
 <style scoped>
 .building-panel {
   @apply flex flex-col items-start overflow-hidden rounded-xl 
-         shadow-[0px_12px_24px_0px_rgba(0,0,0,0.15)] bg-neutral-space w-full max-h-[fit-content] pointer-events-auto;
+         shadow-[0px_12px_24px_0px_rgba(0,0,0,0.15)] bg-neutral-space w-full max-h-[fit-content] pointer-events-auto relative;
+}
+
+.close-button {
+  @apply absolute top-4 right-4 z-50 p-2 rounded-full bg-white hover:bg-neutral-light 
+         transition-colors duration-200 shadow-md hover:shadow-lg cursor-pointer;
+  pointer-events: auto !important;
+}
+
+.close-button svg {
+  @apply text-neutral-dark;
 }
 
 .apartments-list {

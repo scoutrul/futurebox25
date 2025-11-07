@@ -26,6 +26,18 @@ import mapboxgl from 'mapbox-gl'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import modelUrl from '@/assets/models/Futurebox.glb?url'
+import { useBuildingPanel } from '@/composables/useBuildingPanel'
+
+// Props
+const props = defineProps({
+  building: {
+    type: Object,
+    default: () => ({})
+  }
+})
+
+// Используем композицию для управления панелью
+const { showPanel } = useBuildingPanel()
 
 // Refs
 const mapContainer = ref(null)
@@ -401,6 +413,70 @@ const add3DModel = () => {
       tb.add(model)
       model.setCoords(origin)
       
+      // Добавляем обработчик клика на модель
+      model.addTooltip = function() {} // Отключаем стандартный тултип
+      
+      // Устанавливаем, что модель кликабельна
+      model.userData.selectEnabled = true
+      
+      // Обработчик клика на модель
+      handleModelClick = (e) => {
+        if (!tb || !model) return
+        
+        // Получаем координаты клика на canvas
+        const canvas = map.getCanvas()
+        const rect = canvas.getBoundingClientRect()
+        
+        // Преобразуем координаты клика в normalized device coordinates (-1 to +1)
+        const mouse = new THREE.Vector2()
+        mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
+        mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
+        
+        // Создаем raycaster для определения пересечения с моделью
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(mouse, tb.camera)
+        
+        // Проверяем пересечение с моделью
+        const intersects = raycaster.intersectObject(model, true)
+        
+        if (intersects.length > 0) {
+          // Показываем панель здания
+          showPanel(props.building)
+        }
+      }
+      
+      // Обработчик наведения курсора на модель
+      handleMouseMove = (e) => {
+        if (!tb || !model) return
+        
+        // Получаем координаты курсора на canvas
+        const canvas = map.getCanvas()
+        const rect = canvas.getBoundingClientRect()
+        
+        // Преобразуем координаты в normalized device coordinates
+        const mouse = new THREE.Vector2()
+        mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
+        mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
+        
+        // Создаем raycaster для определения пересечения с моделью
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(mouse, tb.camera)
+        
+        // Проверяем пересечение с моделью
+        const intersects = raycaster.intersectObject(model, true)
+        
+        // Меняем курсор в зависимости от того, наведен ли он на модель
+        if (intersects.length > 0) {
+          canvas.style.cursor = 'pointer'
+        } else {
+          canvas.style.cursor = ''
+        }
+      }
+      
+      // Добавляем обработчики на карту
+      map.on('click', handleModelClick)
+      map.on('mousemove', handleMouseMove)
+      
       // Скрываем лоадер после загрузки
       setTimeout(() => {
         isModelLoading.value = false
@@ -531,12 +607,24 @@ const initializeMap = () => {
   })
 }
 
+// Переменные для хранения обработчиков
+let handleModelClick = null
+let handleMouseMove = null
+
 // Lifecycle
 onMounted(() => {
   initializeMap()
 })
 
 onUnmounted(() => {
+  // Удаляем обработчики событий
+  if (map && handleModelClick) {
+    map.off('click', handleModelClick)
+  }
+  if (map && handleMouseMove) {
+    map.off('mousemove', handleMouseMove)
+  }
+  
   if (tb) {
     tb = null
   }

@@ -3,16 +3,16 @@
     <div class="content-overlay">
       <TopBarGuest />
       
-      <!-- Демонстрация компонентов -->
-      <BaseContainer custom-class="demo-section" v-if="false">
-        <!-- Панель фильтров -->
-        <FiltersPanel :price-range="filterRanges.price" :area-range="filterRanges.area"
-        :floor-range="filterRanges.floor" :rooms-options="roomsOptions" :features-options="featuresOptions"
-        @filter-change="handleFilterChange" @reset="handleFilterReset" />
-
+      <!-- Панель здания (показывается при клике на 3D модель) -->
+      <BaseContainer custom-class="demo-section" v-if="isPanelVisible">
         <!-- Панель здания -->
-        <BuildingPanel :building="buildingData" :apartments="apartmentsData" @call-request="handleCallRequest"
-        @view-all="handleViewAll" />
+        <BuildingPanel 
+          :building="buildingData" 
+          :apartments="apartmentsData" 
+          @call-request="handleCallRequest"
+          @view-all="handleViewAll" 
+          @close="handleClose" 
+        />
       </BaseContainer>
       <!-- Карта как фон на весь экран -->
     </div>
@@ -23,10 +23,12 @@
 import TopBarGuest from './components/layout/TopBar.vue'
 import BuildingPanel from './components/building/BuildingPanel.vue'
 import BuildingMap from './components/map/Map.vue'
-import FiltersPanel from './components/filters/FiltersPanel.vue'
 import { BaseContainer } from './components/base'
 import { buildingMockData, apartmentsMockData } from './mocks/buildingData'
-import { filterRanges, roomsOptions, featuresOptions } from './mocks/filtersData'
+import { useBuildingPanel } from './composables/useBuildingPanel'
+
+// Используем композицию для управления панелью
+const { isPanelVisible, hidePanel } = useBuildingPanel()
 
 // Mock данные здания
 const buildingData = buildingMockData
@@ -43,14 +45,11 @@ const handleViewAll = (building) => {
   alert(`Показать все квартиры в ${building.title}`)
 }
 
-// Обработчики фильтров
-const handleFilterChange = (filters) => {
-  console.log('Фильтры изменены:', filters)
+const handleClose = () => {
+  console.log('App: handleClose вызван, закрываем панель')
+  hidePanel()
 }
 
-const handleFilterReset = () => {
-  console.log('Фильтры сброшены')
-}
 </script>
 
 <style>
@@ -83,6 +82,8 @@ body {
 }
 
 .demo-section {
-  @apply flex flex-col md:flex-row justify-center gap-8;
+  @apply flex flex-col md:flex-row gap-8;
+  justify-content: flex-end;
+  pointer-events: auto !important;
 }
 </style>
