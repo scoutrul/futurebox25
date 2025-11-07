@@ -1,8 +1,4 @@
 <template>
-
-    <!-- Карта как фон на весь экран -->
-    <BuildingMap class="map-background" :building="buildingData" />
-    
     <!-- Контент поверх карты -->
     <div class="content-overlay">
       <TopBarGuest />
@@ -18,8 +14,9 @@
         <BuildingPanel :building="buildingData" :apartments="apartmentsData" @call-request="handleCallRequest"
         @view-all="handleViewAll" />
       </BaseContainer>
+      <!-- Карта как фон на весь экран -->
     </div>
- 
+    <BuildingMap class="map-background" :building="buildingData" />
 </template>
 
 <script setup>
