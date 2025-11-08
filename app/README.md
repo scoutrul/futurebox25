@@ -1,24 +1,123 @@
-# futurebox25
+# Futurebox25
 
-## Project setup
-```
-yarn install
-```
+Интерактивная платформа визуализации недвижимости с 3D-моделями и картографией.
 
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
+## 🚀 Установка и запуск
 
-### Compiles and minifies for production
-```
-yarn build
+Проект использует **pnpm** в качестве менеджера пакетов.
+
+### Установка зависимостей
+```bash
+pnpm install
 ```
 
-### Lints and fixes files
-```
-yarn lint
+### Запуск в режиме разработки
+```bash
+pnpm dev
+# или
+pnpm serve
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+### Сборка для продакшена
+```bash
+pnpm build
+```
+
+### Предпросмотр продакшен-сборки
+```bash
+pnpm preview
+```
+
+### Линтинг и исправление
+```bash
+pnpm lint
+```
+
+## 🏗️ Архитектура проекта
+
+### Технологический стек
+- **Vue 3** - фреймворк с Composition API
+- **Vite** - быстрая сборка и HMR
+- **Tailwind CSS** - utility-first CSS framework
+- **Three.js** - 3D визуализация зданий
+- **Mapbox GL** - интерактивные карты
+- **Threebox Plugin** - интеграция Three.js с Mapbox
+
+### Основные подходы
+
+#### 1. Компонентная архитектура
+- **Базовые компоненты** (`components/base/`) - переиспользуемая дизайн-система
+- **Композитные компоненты** (`components/apartments/`, `components/building/`) - бизнес-логика
+- **Презентационные компоненты** - чистые компоненты без состояния
+- **Умные компоненты** - компоненты с логикой и управлением состоянием
+
+#### 2. Composition API
+- Composables (`composables/`) для переиспользуемой логики:
+  - `useBreakpoints` - адаптивные breakpoints
+  - `useBuildingPanel` - управление панелью здания
+  - `useModal3D` - модальные окна с 3D
+
+#### 3. Дизайн-система
+- **Glassmorphism** - стеклянные эффекты и размытие
+- **Mobile-first** - разработка от мобильных к десктопу
+- **@apply** - переиспользование Tailwind стилей
+- Детальная документация в `src/designSystem.md`
+
+#### 4. 3D и Картография
+- Интеграция Three.js для визуализации GLB-моделей
+- Mapbox GL для интерактивных карт
+- Threebox для наложения 3D-моделей на карты
+
+#### 5. Структура данных
+- Mock данные в `src/mocks/` для разработки
+- Типизированные структуры Building и Apartment
+- Унифицированный API для компонентов
+
+## 📁 Структура проекта
+
+```
+src/
+├── assets/           # Статические ресурсы
+│   ├── models/      # 3D модели (.glb)
+│   ├── styles/      # Глобальные стили
+│   └── tex/         # Текстуры и HDR
+├── components/
+│   ├── base/        # Базовые компоненты дизайн-системы
+│   ├── building/    # Компоненты здания
+│   ├── apartments/  # Компоненты квартир
+│   ├── filters/     # Фильтры
+│   ├── layout/      # Layout компоненты
+│   └── map/         # Карта
+├── composables/     # Переиспользуемая логика
+├── mocks/           # Mock данные
+├── designSystem.md  # Документация дизайн-системы
+└── main.js          # Точка входа
+```
+
+## 📖 Документация
+
+- **Дизайн-система**: `src/designSystem.md`
+- **Компоненты**: `src/components/README.md`
+- **Layout**: `src/components/layout/README.md`
+- **Composables**: `src/composables/README.md`
+
+## 🎨 Ключевые особенности
+
+- 🏢 Интерактивная визуализация недвижимости
+- 🗺️ Интеграция с Mapbox для карт
+- 🎭 3D-модели зданий в формате GLB
+- 📱 Адаптивный дизайн (mobile-first)
+- 🎨 Современная дизайн-система с glassmorphism
+- ⚡ Быстрая разработка с Vite HMR
+- 🧩 Модульная архитектура компонентов
+
+## 🔧 Конфигурация
+
+### Tailwind CSS
+Настройка в `tailwind.config.js` с кастомной палитрой и breakpoints.
+
+### Vite
+Конфигурация в `vite.config.js` с поддержкой Vue 3 и алиасами.
+
+### PostCSS
+Автопрефиксер и Tailwind в `postcss.config.js`.
