@@ -23,6 +23,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import modelUrl from '@/assets/models/Futurebox.glb?url'
@@ -44,11 +45,10 @@ const mapContainer = ref(null)
 const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJtMzIwbTdoOHZ5In0.hzXJEVACTihdI_E84Td81w'
 
 // Map variables
-let map = null
+let mapBoxGl = null
 let origin = [37.427354, 55.812668]
-let tb = null // Threebox instance
+let threeBox = null // Threebox instance
 
-// Model configuration (из примера map.js)
 let modelRotation = -25
 let modelScale = 1
 let model = null
@@ -64,19 +64,6 @@ const loaderPosition = ref({
   opacity: 0
 })
 
-// Логирование структуры модели (из примера)
-const logModelStructure = (object, depth = 0) => {
-  const indent = '  '.repeat(depth)
-  console.log(`${indent}${object.name || 'unnamed'} [${object.type}]`)
-  
-  if (object.children) {
-    object.children.forEach(child => {
-      logModelStructure(child, depth + 1)
-    })
-  }
-}
-
-// Поиск коллекций по иерархии (из примера)
 const findCollectionsByHierarchy = () => {
   if (!model) return
   
@@ -181,9 +168,9 @@ const enhanceModelMaterials = (modelObject) => {
 
 // Добавление реалистичного освещения (из примера)
 const addRealisticLighting = () => {
-  if (!tb) return
+  if (!threeBox) return
   
-  const scene = tb.scene
+  const scene = threeBox.scene
   
   // Очищаем существующие источники света
   const lightsToRemove = []
@@ -235,9 +222,9 @@ const addRealisticLighting = () => {
 
 // Создание fallback освещения с небом (из примера)
 const addFallbackLightingWithSky = () => {
-  if (!tb) return
+  if (!threeBox) return
   
-  const scene = tb.scene
+  const scene = threeBox.scene
   
   // Создаем реалистичный градиент неба
   const canvas = document.createElement('canvas')
@@ -266,13 +253,13 @@ const addFallbackLightingWithSky = () => {
   addRealisticLighting()
   
   // Настройки tone mapping для реалистичной экспозиции
-  if (tb.renderer) {
-    tb.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    tb.renderer.toneMappingExposure = 1.3
-    tb.renderer.outputEncoding = THREE.sRGBEncoding
-    tb.renderer.shadowMap.enabled = true
-    tb.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    tb.renderer.physicallyCorrectLights = true
+  if (threeBox.renderer) {
+    threeBox.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    threeBox.renderer.toneMappingExposure = 1.3
+    threeBox.renderer.outputEncoding = THREE.sRGBEncoding
+    threeBox.renderer.shadowMap.enabled = true
+    threeBox.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    threeBox.renderer.physicallyCorrectLights = true
   }
   
   console.log('Применено fallback освещение с небом')
@@ -280,10 +267,10 @@ const addFallbackLightingWithSky = () => {
 
 // Обновление позиции лоадера
 const updateLoaderPosition = () => {
-  if (!map) return
+  if (!mapBoxGl) return
 
   // Преобразуем географические координаты в пиксельные координаты экрана
-  const point = map.project(origin)
+  const point = mapBoxGl.project(origin)
   
   loaderPosition.value = {
     left: `${point.x}px`,
@@ -302,13 +289,13 @@ const add3DModel = () => {
   updateLoaderPosition()
   
   // Обновляем позицию лоадера при движении карты
-  map.on('move', updateLoaderPosition)
-  map.on('zoom', updateLoaderPosition)
+  mapBoxGl.on('move', updateLoaderPosition)
+  mapBoxGl.on('zoom', updateLoaderPosition)
   
   // Инициализируем Threebox
-  tb = window.tb = new Threebox(
-    map,
-    map.getCanvas().getContext('webgl'),
+  threeBox = window.tb = new Threebox(
+    mapBoxGl,
+    mapBoxGl.getCanvas().getContext('webgl'),
     {
       defaultLights: false,
       enableSelectingObjects: false,
@@ -318,183 +305,144 @@ const add3DModel = () => {
     }
   )
   
+  // Настраиваем renderer для правильной работы с ресайзом
+  if (threeBox.renderer) {
+    threeBox.renderer.autoClear = false
+  }
+  
   // Добавляем environment map для отражений и освещения
   addFallbackLightingWithSky()
   
   console.log('Начинаем загрузку модели...', modelUrl)
   
   // Загружаем 3D модель
-  tb.loadObj({
-    obj: modelUrl,
-    type: 'gltf',
-    scale: modelScale,
-    units: 'meters',
-    rotation: { x: 90, y: modelRotation, z: 0 },
-    anchor: 'center',
-    tooltip: false
-  }, function (loadedModel) {
-    console.log('Callback загрузки модели вызван', loadedModel ? 'успешно' : 'с ошибкой')
-    if (loadedModel) {
-      model = loadedModel
-      model.userData.selectEnabled = false
-      
-      // Логируем структуру модели
-      console.log('=== СТРУКТУРА МОДЕЛИ ===')
-      logModelStructure(model, 0)
-      
-      // Ищем и сохраняем ссылки на коллекции bottom и top
-      model.traverse((child) => {
-        const childName = child.name.toLowerCase()
+  try {
+    threeBox.loadObj({
+      obj: modelUrl,
+      type: 'gltf',
+      scale: modelScale,
+      units: 'meters',
+      rotation: { x: 90, y: modelRotation, z: 0 },
+      anchor: 'center',
+      tooltip: false
+    }, function (loadedModel) {
+      console.log('Callback загрузки модели вызван', loadedModel ? 'успешно' : 'с ошибкой')
+      if (loadedModel) {
+        model = loadedModel
+        model.userData.selectEnabled = false
         
-        console.log('Проверка дочернего элемента:', child.name, 'Тип:', child.type)
-        
-        // Проверка на bottom коллекцию
-        if (childName.includes('bottom') || 
-            childName.includes('base') ||
-            childName.includes('lower') ||
-            childName === 'bottom') {
-          modelBottom = child
-          console.log('✓ Найдена BOTTOM коллекция:', child.name)
-        }
-        
-        // Проверка на top коллекцию
-        if (childName.includes('top') || 
-            childName.includes('upper') ||
-            childName.includes('roof') ||
-            childName === 'top') {
-          modelTop = child
-          console.log('✓ Найдена TOP коллекция:', child.name)
-        }
-        
-        // Устанавливаем свойства рендеринга для всех мешей
-        if (child.isMesh) {
-          child.renderOrder = 999
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(mat => {
-                mat.depthTest = true
-                mat.depthWrite = true
-              })
-            } else {
-              child.material.depthTest = true
-              child.material.depthWrite = true
+        // Ищем и сохраняем ссылки на коллекции bottom и top
+        model.traverse((child) => {
+          const childName = child.name.toLowerCase()
+          
+          // Проверка на bottom коллекцию
+          if (childName.includes('bottom') || 
+              childName.includes('base') ||
+              childName.includes('lower') ||
+              childName === 'bottom') {
+            modelBottom = child
+            console.log('✓ Найдена BOTTOM коллекция:', child.name)
+          }
+          
+          // Проверка на top коллекцию
+          if (childName.includes('top') || 
+              childName.includes('upper') ||
+              childName.includes('roof') ||
+              childName === 'top') {
+            modelTop = child
+            console.log('✓ Найдена TOP коллекция:', child.name)
+          }
+          
+          // Устанавливаем свойства рендеринга для всех мешей
+          if (child.isMesh) {
+            child.renderOrder = 999
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => {
+                  mat.depthTest = true
+                  mat.depthWrite = true
+                })
+              } else {
+                child.material.depthTest = true
+                child.material.depthWrite = true
+              }
             }
           }
+        })
+        
+        // Если не найдены по имени, пробуем найти по иерархии
+        if (!modelBottom || !modelTop) {
+          console.warn('Коллекции не найдены по имени, пробуем поиск по иерархии...')
+          findCollectionsByHierarchy()
         }
-      })
-      
-      // Если не найдены по имени, пробуем найти по иерархии
-      if (!modelBottom || !modelTop) {
-        console.warn('Коллекции не найдены по имени, пробуем поиск по иерархии...')
-        findCollectionsByHierarchy()
-      }
-      
-      // Финальная проверка
-      if (modelBottom) {
-        console.log('✓ Bottom коллекция готова:', modelBottom.name)
-      } else {
-        console.error('✗ Bottom коллекция не найдена!')
-      }
-      
-      if (modelTop) {
-        console.log('✓ Top коллекция готова:', modelTop.name)
-      } else {
-        console.error('✗ Top коллекция не найдена!')
-      }
-      
-      // Применяем environment map если доступен
-      if (tb.scene.environment) {
-        updateModelMaterials(tb.scene.environment)
-      }
-      
-      // Улучшаем материалы
-      enhanceModelMaterials(model)
-      
-      tb.add(model)
-      model.setCoords(origin)
-      
-      // Добавляем обработчик клика на модель
-      model.addTooltip = function() {} // Отключаем стандартный тултип
-      
-      // Устанавливаем, что модель кликабельна
-      model.userData.selectEnabled = true
-      
-      // Обработчик клика на модель
-      handleModelClick = (e) => {
-        if (!tb || !model) return
         
-        // Получаем координаты клика на canvas
-        const canvas = map.getCanvas()
-        const rect = canvas.getBoundingClientRect()
-        
-        // Преобразуем координаты клика в normalized device coordinates (-1 to +1)
-        const mouse = new THREE.Vector2()
-        mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
-        mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
-        
-        // Создаем raycaster для определения пересечения с моделью
-        const raycaster = new THREE.Raycaster()
-        raycaster.setFromCamera(mouse, tb.camera)
-        
-        // Проверяем пересечение с моделью
-        const intersects = raycaster.intersectObject(model, true)
-        
-        if (intersects.length > 0) {
-          // Показываем панель здания
-          showPanel(props.building)
-        }
-      }
-      
-      // Обработчик наведения курсора на модель
-      handleMouseMove = (e) => {
-        if (!tb || !model) return
-        
-        // Получаем координаты курсора на canvas
-        const canvas = map.getCanvas()
-        const rect = canvas.getBoundingClientRect()
-        
-        // Преобразуем координаты в normalized device coordinates
-        const mouse = new THREE.Vector2()
-        mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
-        mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
-        
-        // Создаем raycaster для определения пересечения с моделью
-        const raycaster = new THREE.Raycaster()
-        raycaster.setFromCamera(mouse, tb.camera)
-        
-        // Проверяем пересечение с моделью
-        const intersects = raycaster.intersectObject(model, true)
-        
-        // Меняем курсор в зависимости от того, наведен ли он на модель
-        if (intersects.length > 0) {
-          canvas.style.cursor = 'pointer'
+        // Финальная проверка
+        if (modelBottom) {
+          console.log('✓ Bottom коллекция готова:', modelBottom.name)
         } else {
-          canvas.style.cursor = ''
+          console.error('✗ Bottom коллекция не найдена!')
         }
-      }
-      
-      // Добавляем обработчики на карту
-      map.on('click', handleModelClick)
-      map.on('mousemove', handleMouseMove)
-      
-      // Скрываем лоадер после загрузки
-      setTimeout(() => {
+        
+        if (modelTop) {
+          console.log('✓ Top коллекция готова:', modelTop.name)
+        } else {
+          console.error('✗ Top коллекция не найдена!')
+        }
+        
+        // Применяем environment map если доступен
+        if (threeBox.scene.environment) {
+          updateModelMaterials(threeBox.scene.environment)
+        }
+        
+        // Улучшаем материалы
+        enhanceModelMaterials(model)
+        
+        threeBox.add(model)
+        model.setCoords(origin)
+        
+        // Добавляем обработчик клика на модель
+        model.addTooltip = function() {} // Отключаем стандартный тултип
+        
+        // Устанавливаем, что модель кликабельна
+        model.userData.selectEnabled = true
+        
+        // Привязываем обработчики
+        handleModelClick = onModelClick
+        handleMouseMove = onModelHover
+        
+        // Добавляем обработчики на карту
+        mapBoxGl.on('click', handleModelClick)
+        mapBoxGl.on('mousemove', handleMouseMove)
+        
+        // Скрываем лоадер после загрузки
+        setTimeout(() => {
+          isModelLoading.value = false
+          
+          // Отключаем обновление позиции лоадера
+          mapBoxGl.off('move', updateLoaderPosition)
+          mapBoxGl.off('zoom', updateLoaderPosition)
+        }, 500)
+        
+        mapBoxGl.triggerRepaint()
+        
+        console.log('Модель успешно загружена')
+      } else {
+        console.error('Не удалось загрузить модель')
         isModelLoading.value = false
         
         // Отключаем обновление позиции лоадера
-        map.off('move', updateLoaderPosition)
-        map.off('zoom', updateLoaderPosition)
-      }, 500)
-      
-      map.triggerRepaint()
-      
-      console.log('Модель успешно загружена')
-    } else {
-      console.error('Не удалось загрузить модель')
-      isModelLoading.value = false
-    }
-  })
- 
+        mapBoxGl.off('move', updateLoaderPosition)
+        mapBoxGl.off('zoom', updateLoaderPosition)
+      }
+    })
+  } catch (error) {
+    console.error('Ошибка при загрузке модели:', error)
+    isModelLoading.value = false
+    
+    // Отключаем обновление позиции лоадера
+    mapBoxGl.off('move', updateLoaderPosition)
+    mapBoxGl.off('zoom', updateLoaderPosition)
+  }
 }
 
 const initializeMap = () => {
@@ -502,7 +450,7 @@ const initializeMap = () => {
   mapboxgl.accessToken = accessToken
 
   // Initialize map
-  map = new mapboxgl.Map({
+  mapBoxGl = new mapboxgl.Map({
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/standard',
     center: origin,
@@ -521,27 +469,27 @@ const initializeMap = () => {
   let lastX = 0
   let lastY = 0
   
-  map.getCanvas().addEventListener('mousedown', (e) => {
+  mapBoxGl.getCanvas().addEventListener('mousedown', (e) => {
     if (e.button === 2) { // Правая кнопка мыши
       isDragging = true
       lastX = e.clientX
       lastY = e.clientY
-      map.getCanvas().style.cursor = 'grab'
+      mapBoxGl.getCanvas().style.cursor = 'grab'
       e.preventDefault()
     }
   })
   
-  map.getCanvas().addEventListener('mousemove', (e) => {
+  mapBoxGl.getCanvas().addEventListener('mousemove', (e) => {
     if (isDragging) {
       const deltaX = e.clientX - lastX
       const deltaY = e.clientY - lastY
       
       // Инвертированное вращение: мышь вправо = карта вправо, мышь вверх = карта вверх
-      const bearing = map.getBearing() + (deltaX * rotateSpeed)
-      const pitch = map.getPitch() - (deltaY * rotateSpeed * 0.3)
+      const bearing = mapBoxGl.getBearing() + (deltaX * rotateSpeed)
+      const pitch = mapBoxGl.getPitch() - (deltaY * rotateSpeed * 0.3)
       
-      map.setBearing(bearing)
-      map.setPitch(Math.max(0, Math.min(85, pitch))) // Ограничиваем pitch
+      mapBoxGl.setBearing(bearing)
+      mapBoxGl.setPitch(Math.max(0, Math.min(85, pitch))) // Ограничиваем pitch
       
       lastX = e.clientX
       lastY = e.clientY
@@ -549,27 +497,35 @@ const initializeMap = () => {
     }
   })
   
-  map.getCanvas().addEventListener('mouseup', (e) => {
+  mapBoxGl.getCanvas().addEventListener('mouseup', (e) => {
     if (e.button === 2) {
       isDragging = false
-      map.getCanvas().style.cursor = ''
+      mapBoxGl.getCanvas().style.cursor = ''
     }
   })
   
   // Отключаем контекстное меню при правой кнопке мыши
-  map.getCanvas().addEventListener('contextmenu', (e) => {
+  mapBoxGl.getCanvas().addEventListener('contextmenu', (e) => {
     e.preventDefault()
+  })
+  
+  // Обработчик ресайза для правильного обновления пропорций
+  mapBoxGl.on('resize', () => {
+    if (threeBox && threeBox.renderer) {
+      const canvas = mapBoxGl.getCanvas()
+      threeBox.renderer.setSize(canvas.width, canvas.height)
+    }
   })
 
   // Configure map when style loads
-  map.on('style.load', () => {
+  mapBoxGl.once('style.load', () => {
     console.log("Стиль карты загружен")
 
     // Set map environment
-    map.setConfigProperty('basemap', 'lightPreset', 'day')
+    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'day')
 
     // Add fog effect for depth
-    map.setFog({
+    mapBoxGl.setFog({
       'color': 'rgb(186, 210, 235)',
       'high-color': 'rgb(36, 92, 223)',
       'horizon-blend': 0.02,
@@ -578,7 +534,7 @@ const initializeMap = () => {
     })
     
     // Находим первый symbol layer для вставки 3D слоя перед ним
-    const layers = map.getStyle().layers
+    const layers = mapBoxGl.getStyle().layers
     let firstSymbolId
     for (let i = 0; i < layers.length; i++) {
       if (layers[i].type === 'symbol') {
@@ -587,29 +543,91 @@ const initializeMap = () => {
       }
     }
     
-    // Добавляем custom 3D layer ПЕРЕД первым symbol layer
-    // Это делает его видимым поверх 3D зданий
-    map.addLayer({
-      id: 'custom-threebox-layer',
-      type: 'custom',
-      renderingMode: '3d',
-      onAdd: function() {
-        add3DModel()
-      },
-      render: function() {
-        if (tb) {
-          tb.update()
+    // Проверяем, не существует ли уже слой
+    if (!mapBoxGl.getLayer('custom-threebox-layer')) {
+      // Добавляем custom 3D layer ПЕРЕД первым symbol layer
+      // Это делает его видимым поверх 3D зданий
+      mapBoxGl.addLayer({
+        id: 'custom-threebox-layer',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: function() {
+          add3DModel()
+        },
+        render: function() {
+          if (threeBox) {
+            // Сбрасываем состояние WebGL перед рендером (как в официальном примере Mapbox)
+            if (threeBox.renderer) {
+              threeBox.renderer.resetState()
+            }
+            threeBox.update()
+            mapBoxGl.triggerRepaint()
+          }
         }
-      }
-    }, firstSymbolId) // Вставляем перед первым symbol layer
-    
-    console.log('Custom 3D layer добавлен перед symbol layer:', firstSymbolId)
+      }, firstSymbolId) // Вставляем перед первым symbol layer
+      
+      console.log('Custom 3D layer добавлен перед symbol layer:', firstSymbolId)
+    }
   })
 }
 
 // Переменные для хранения обработчиков
 let handleModelClick = null
 let handleMouseMove = null
+
+// Метод обработки клика по модели
+const onModelClick = (e) => {
+  if (!threeBox || !model) return
+  
+  // Получаем координаты клика на canvas
+  const canvas = mapBoxGl.getCanvas()
+  const rect = canvas.getBoundingClientRect()
+  
+  // Преобразуем координаты клика в normalized device coordinates (-1 to +1)
+  const mouse = new THREE.Vector2()
+  mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
+  
+  // Создаем raycaster для определения пересечения с моделью
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(mouse, threeBox.camera)
+  
+  // Проверяем пересечение с моделью
+  const intersects = raycaster.intersectObject(model, true)
+  
+  if (intersects.length > 0) {
+    // Показываем панель здания
+    showPanel(props.building)
+  }
+}
+
+// Метод обработки наведения на модель
+const onModelHover = (e) => {
+  if (!threeBox || !model) return
+  
+  // Получаем координаты курсора на canvas
+  const canvas = mapBoxGl.getCanvas()
+  const rect = canvas.getBoundingClientRect()
+  
+  // Преобразуем координаты в normalized device coordinates
+  const mouse = new THREE.Vector2()
+  mouse.x = ((e.point.x - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((e.point.y - rect.top) / rect.height) * 2 + 1
+  
+  // Создаем raycaster для определения пересечения с моделью
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(mouse, threeBox.camera)
+  
+  // Проверяем пересечение с моделью
+  const intersects = raycaster.intersectObject(model, true)
+  
+  // Меняем курсор в зависимости от того, наведен ли он на модель
+  if (intersects.length > 0) {
+    canvas.style.cursor = 'pointer'
+  } else {
+    canvas.style.cursor = ''
+  }
+}
 
 // Lifecycle
 onMounted(() => {
@@ -618,19 +636,23 @@ onMounted(() => {
 
 onUnmounted(() => {
   // Удаляем обработчики событий
-  if (map && handleModelClick) {
-    map.off('click', handleModelClick)
-  }
-  if (map && handleMouseMove) {
-    map.off('mousemove', handleMouseMove)
+  if (mapBoxGl) {
+    if (handleModelClick) {
+      mapBoxGl.off('click', handleModelClick)
+    }
+    if (handleMouseMove) {
+      mapBoxGl.off('mousemove', handleMouseMove)
+    }
+    // Удаляем обработчик ресайза
+    mapBoxGl.off('resize')
   }
   
-  if (tb) {
-    tb = null
+  if (threeBox) {
+    threeBox = null
   }
   
-  if (map) {
-    map.remove()
+  if (mapBoxGl) {
+    mapBoxGl.remove()
   }
 })
 </script>
