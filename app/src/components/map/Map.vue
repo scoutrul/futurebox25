@@ -532,6 +532,37 @@ const initializeMap = () => {
       'space-color': 'rgb(11, 11, 25)',
       'star-intensity': 0.6
     })
+
+    // Add sky layer with realistic atmosphere
+    if (!mapBoxGl.getLayer('sky')) {
+    mapBoxGl.addLayer({
+        'id': 'sky',
+        'type': 'sky',
+        'paint': {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 85.0],
+            'sky-atmosphere-sun-intensity': 10,
+            'sky-atmosphere-color': 'rgba(135, 206, 235, 1)',
+            'sky-atmosphere-halo-color': 'rgba(255, 255, 255, 0.5)',
+            'sky-gradient-center': [0, 0],
+            'sky-gradient-radius': 90,
+            'sky-gradient': [
+                'interpolate',
+                ['linear'],
+                ['sky-radial-progress'],
+                0.8, 'rgba(135, 206, 235, 1)',
+                1, 'rgba(255, 255, 255, 1)'
+            ],
+            'sky-opacity': [
+                'interpolate',
+                ['exponential', 0.1],
+                ['zoom'],
+                5, 0,
+                6, 1
+            ]
+        }
+    });
+    }
     
     // Находим первый symbol layer для вставки 3D слоя перед ним
     const layers = mapBoxGl.getStyle().layers
