@@ -61,12 +61,15 @@
            focus:outline-none;
   }
   
-  /* Кнопка - secondary */
+  /* Кнопка - secondary (из макета Figma) */
   .btn-secondary {
-    @apply btn bg-white text-neutral-dark border border-neutral-dark
-           hover:bg-gray-50 hover:shadow-sm
-           active:bg-gray-100
-           focus:outline-none;
+    @apply btn bg-[#e6e6e6] text-[#1d1d1d]
+           rounded-[4px] border-0 font-normal
+           hover:bg-[#d6d6d6]
+           active:bg-[#c6c6c6]
+           focus:outline-none
+           w-full
+           max-w-[158px];
   }
   
   /* Кнопка - ghost */

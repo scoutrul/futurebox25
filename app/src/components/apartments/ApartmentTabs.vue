@@ -15,6 +15,7 @@
       
       <!-- Кнопка "Смотреть все" -->
       <button 
+        v-if="false"
         class="view-all-button"
         @click="$emit('view-all')"
       >

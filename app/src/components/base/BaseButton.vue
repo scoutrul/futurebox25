@@ -95,10 +95,10 @@ const buttonClasses = computed(() => {
   }
   classes.push(variantMap[props.variant])
   
-  // Размер
+  // Размер (из макета Figma)
   const sizeMap = {
-    sm: 'text-[14px] leading-[1.5] px-4 py-2',
-    md: 'text-[16px] leading-[1.6] px-5 py-3',
+    sm: 'text-[16px] leading-[1.6] px-[20px] py-[12px]',
+    md: 'text-[16px] leading-[1.6] px-[20px] py-[12px]',
     lg: 'text-[18px] leading-[1.6] px-6 py-4'
   }
   classes.push(sizeMap[props.size])

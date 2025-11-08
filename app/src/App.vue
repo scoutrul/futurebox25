@@ -1,7 +1,7 @@
 <template>
     <!-- Контент поверх карты -->
     <div class="content-overlay">
-      <TopBarGuest />
+      <AppTopBar @action="handleRequestAction" />
       
       <!-- Панель здания (показывается при клике на 3D модель) -->
       <BaseContainer custom-class="demo-section" v-if="isPanelVisible">
@@ -17,18 +17,29 @@
       <!-- Карта как фон на весь экран -->
     </div>
     <BuildingMap class="map-background" :building="buildingData" />
+
+    <!-- Глобальная модалка для 3D планов -->
+    <Modal3DViewer 
+      :is-visible="isModalVisible"
+      :url="modal3DUrl"
+      @close="closeModal"
+    />
 </template>
 
 <script setup>
-import TopBarGuest from './components/layout/TopBar.vue'
+import AppTopBar from './components/layout/AppTopBar.vue'
 import BuildingPanel from './components/building/BuildingPanel.vue'
 import BuildingMap from './components/map/Map.vue'
-import { BaseContainer } from './components/base'
+import { BaseContainer, Modal3DViewer } from './components/base'
 import { buildingMockData, apartmentsMockData } from './mocks/buildingData'
 import { useBuildingPanel } from './composables/useBuildingPanel'
+import { useModal3D } from './composables/useModal3D'
 
 // Используем композицию для управления панелью
 const { isPanelVisible, hidePanel } = useBuildingPanel()
+
+// Используем композицию для управления модалкой 3D планов
+const { isModalVisible, modal3DUrl, closeModal } = useModal3D()
 
 // Mock данные здания
 const buildingData = buildingMockData
@@ -48,6 +59,11 @@ const handleViewAll = (building) => {
 const handleClose = () => {
   console.log('App: handleClose вызван, закрываем панель')
   hidePanel()
+}
+
+const handleRequestAction = () => {
+  console.log('Запрос отправлен')
+  alert('Ваш запрос отправлен!')
 }
 
 </script>

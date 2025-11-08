@@ -56,7 +56,7 @@ export const apartmentsMockData = [
     description: '1 спальня, гостиная-кухня, санузел',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=YV01CHsNPYX' },
       { label: 'Панорамные окна', highlighted: false },
       { label: 'Балкон', highlighted: false }
     ]
@@ -68,7 +68,7 @@ export const apartmentsMockData = [
     description: '1 спальня, гостиная-кухня, санузел',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=YV01CHsNPYX' },
       { label: 'Панорамные окна', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false }
     ]
@@ -80,7 +80,7 @@ export const apartmentsMockData = [
     description: '1 спальня, гостиная-кухня, санузел',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=YV01CHsNPYX' },
       { label: 'Балкон', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false }
     ]
@@ -94,7 +94,7 @@ export const apartmentsMockData = [
     description: '2 спальни, гостиная-кухня, санузел',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=z4QqVlLpehh' },
       { label: 'Панорамные окна', highlighted: false },
       { label: 'Балкон', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false }
@@ -107,7 +107,7 @@ export const apartmentsMockData = [
     description: '2 спальни, гостиная-кухня, 2 санузла',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=z4QqVlLpehh' },
       { label: 'Панорамные окна', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false }
     ]
@@ -121,7 +121,7 @@ export const apartmentsMockData = [
     description: '3 спальни, гостиная-кухня, 2 санузла',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=EBU2xJqC050' },
       { label: 'Панорамные окна', highlighted: false },
       { label: 'Балкон', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false },
@@ -135,41 +135,10 @@ export const apartmentsMockData = [
     description: '3 спальни, гостиная-кухня, 2 санузла, кладовая',
     imageSrc: apartmentPlanPlaceholder,
     features: [
-      { label: '3Д-план', highlighted: true },
+      { label: '3Д-план', highlighted: true, is3DPlan: true, url: 'http://ai.webgldeveloper.pro/view/view.html?key=EBU2xJqC050' },
       { label: 'Панорамные окна', highlighted: false },
       { label: '2 балкона', highlighted: false },
       { label: 'Встроенная кухня', highlighted: false }
-    ]
-  },
-  
-  // Четырехкомнатные
-  {
-    id: 'apt-4-1',
-    rooms: 4,
-    area: 125,
-    description: '4 спальни, гостиная-кухня, 3 санузла',
-    imageSrc: apartmentPlanPlaceholder,
-    features: [
-      { label: '3Д-план', highlighted: true },
-      { label: 'Панорамные окна', highlighted: false },
-      { label: 'Балкон', highlighted: false },
-      { label: 'Встроенная кухня', highlighted: false },
-      { label: 'Гардеробная', highlighted: false },
-      { label: 'Кладовая', highlighted: false }
-    ]
-  },
-  {
-    id: 'apt-4-2',
-    rooms: 4,
-    area: 135,
-    description: '4 спальни, гостиная-кухня, 3 санузла, кабинет',
-    imageSrc: apartmentPlanPlaceholder,
-    features: [
-      { label: '3Д-план', highlighted: true },
-      { label: 'Панорамные окна', highlighted: false },
-      { label: '2 балкона', highlighted: false },
-      { label: 'Встроенная кухня', highlighted: false },
-      { label: 'Гардеробная', highlighted: false }
     ]
   }
 ]

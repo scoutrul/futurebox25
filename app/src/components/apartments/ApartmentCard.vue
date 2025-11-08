@@ -45,6 +45,8 @@
           :key="index"
           :variant="feature.highlighted ? 'success' : 'secondary'"
           size="sm"
+          :class="{ 'cursor-pointer hover:opacity-80 transition-opacity': feature.is3DPlan && feature.url }"
+          @click="handleFeatureClick(feature)"
         >
           {{ feature.label }}
         </BaseBadge>
@@ -55,6 +57,9 @@
 
 <script setup>
 import { BaseText, BaseBadge } from '../base'
+import { useModal3D } from '@/composables/useModal3D'
+
+const { openModal } = useModal3D()
 
 defineProps({
   /**
@@ -68,6 +73,16 @@ defineProps({
     }
   }
 })
+
+/**
+ * Обработчик клика на feature badge
+ * Если это 3D план с URL - открываем модалку
+ */
+const handleFeatureClick = (feature) => {
+  if (feature.is3DPlan && feature.url) {
+    openModal(feature.url)
+  }
+}
 </script>
 
 <style scoped>
