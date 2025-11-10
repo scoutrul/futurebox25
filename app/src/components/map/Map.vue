@@ -26,7 +26,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
-import modelUrl from '@/assets/models/Futurebox.glb?url'
+import modelUrl from '@/assets/models/FutureboxNew.glb?url'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
 
 // Props
@@ -463,7 +463,7 @@ const initializeMap = () => {
   })
   
   // Реализуем собственное вращение правой кнопкой мыши с замедленной скоростью
-  const rotateSpeed = 0.12 // Коэффициент замедления (0.12 = очень медленное вращение)
+  const rotateSpeed = 0.5 // Коэффициент замедления (0.12 = очень медленное вращение)
   
   let isDragging = false
   let lastX = 0
