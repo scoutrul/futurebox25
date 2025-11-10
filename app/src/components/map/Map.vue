@@ -26,8 +26,11 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import modelUrl from '@/assets/models/FutureboxNew.glb?url'
+import environmentUrl from '@/assets/tex/environment.hdr?url'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
+
 
 // Props
 const props = defineProps({
@@ -46,14 +49,15 @@ const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJt
 
 // Map variables
 let mapBoxGl = null
-let origin = [37.427354, 55.812668]
+let origin = [37.430154, 55.811268]
 let threeBox = null // Threebox instance
 
-let modelRotation = -25
+let modelRotation = -278
 let modelScale = 1
 let model = null
 let modelBottom = null // Reference to bottom collection
 let modelTop = null // Reference to top collection
+let environmentMap = null
 
 // Loader state
 const isModelLoading = ref(false)
@@ -63,6 +67,36 @@ const loaderPosition = ref({
   transform: 'translate(-50%, -50%)',
   opacity: 0
 })
+
+// Функция загрузки HDR environment map
+const loadEnvironmentMap = () => {
+  return new Promise((resolve, reject) => {
+    const rgbeLoader = new RGBELoader()
+    
+    console.log('🔄 Начинаем загрузку HDR environment map:', environmentUrl)
+    
+    rgbeLoader.load(
+      environmentUrl,
+      (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping
+        environmentMap = texture
+        console.log('✓ HDR environment map успешно загружена')
+        resolve(texture)
+      },
+      (progress) => {
+        // Опционально: отслеживание прогресса загрузки
+        if (progress.lengthComputable) {
+          const percentComplete = (progress.loaded / progress.total) * 100
+          console.log(`📊 HDR загрузка: ${percentComplete.toFixed(2)}%`)
+        }
+      },
+      (error) => {
+        console.error('✗ Ошибка загрузки HDR environment map:', error)
+        reject(error)
+      }
+    )
+  })
+}
 
 const findCollectionsByHierarchy = () => {
   if (!model) return
@@ -94,18 +128,19 @@ const updateModelMaterials = (envMap) => {
           // Применяем envMap только к стеклу/окнам для отражений
           if (matName.includes('glass') || matName.includes('window')) {
             mat.envMap = envMap
-            mat.metalness = 0.1
-            mat.roughness = 0.02
-            mat.transparent = true
-            mat.opacity = 0.5
-            mat.color.setHex(0xDDEEFF)
+            mat.envMapIntensity = 2; // Set intensity to 0.5
+            // mat.metalness = 0.1
+            // mat.roughness = 0.02
+            // mat.transparent = true
+            // mat.opacity = 0.5
+            // mat.color.setHex(0xDDEEFF)
           }
           // Металл/алюминий - тоже получает отражения
-          else if (matName.includes('metal') || matName.includes('aluminum')) {
-            mat.envMap = envMap
-            mat.metalness = 0.8
-            mat.roughness = 0.2
-          }
+          // else if (matName.includes('metal') || matName.includes('aluminum')) {
+          //   mat.envMap = envMap
+          //   mat.metalness = 0.8
+          //   mat.roughness = 0.2
+          // }
           // Все остальные материалы - без envMap
           else {
             mat.envMap = null
@@ -166,103 +201,62 @@ const enhanceModelMaterials = (modelObject) => {
   console.log('Материалы модели улучшены')
 }
 
-// Добавление реалистичного освещения (из примера)
-const addRealisticLighting = () => {
+// Обновленная функция создания fallback освещения
+const addFallbackLightingWithSky = async () => {
   if (!threeBox) return
   
   const scene = threeBox.scene
   
-  // Очищаем существующие источники света
-  const lightsToRemove = []
-  scene.children.forEach(child => {
-    if (child.isLight) {
-      lightsToRemove.push(child)
-    }
-  })
-  lightsToRemove.forEach(light => scene.remove(light))
-  
-  // 1. Основной солнечный свет
-  const sunLight = new THREE.DirectionalLight(0xfff5e6, 3.5)
-  sunLight.position.set(100, 150, -50)
-  sunLight.castShadow = true
-  
-  // Настройки теней высокого качества
-  sunLight.shadow.mapSize.width = 2048
-  sunLight.shadow.mapSize.height = 2048
-  sunLight.shadow.camera.near = 0.5
-  sunLight.shadow.camera.far = 500
-  sunLight.shadow.camera.left = -150
-  sunLight.shadow.camera.right = 150
-  sunLight.shadow.camera.top = 150
-  sunLight.shadow.camera.bottom = -150
-  sunLight.shadow.bias = -0.0001
-  sunLight.shadow.radius = 2
-  
-  scene.add(sunLight)
-  
-  // 2. Небесный свет (hemisphere light для ambient)
-  const skyLight = new THREE.HemisphereLight(
-    0x87ceeb, // Цвет неба
-    0xc4b5a0, // Цвет земли (теплый)
-    1.0
-  )
-  scene.add(skyLight)
-  
-  // 3. Заполняющий свет (отраженный от земли/окружения)
-  const fillLight = new THREE.DirectionalLight(0xb8d8f0, 0.8)
-  fillLight.position.set(-50, 30, 50)
-  scene.add(fillLight)
-  
-  // 4. Слабое ambient освещение
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
-  scene.add(ambientLight)
-  
-  console.log('Реалистичное освещение добавлено')
-}
-
-// Создание fallback освещения с небом (из примера)
-const addFallbackLightingWithSky = () => {
-  if (!threeBox) return
-  
-  const scene = threeBox.scene
-  
-  // Создаем реалистичный градиент неба
-  const canvas = document.createElement('canvas')
-  canvas.width = 2048
-  canvas.height = 1024
-  const context = canvas.getContext('2d')
-  
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
-  gradient.addColorStop(0, '#0d5e9e')    // Глубокий синий в зените
-  gradient.addColorStop(0.3, '#4a9fd8')  // Средний синий
-  gradient.addColorStop(0.7, '#b8d8f0')  // Светло-синий у горизонта
-  gradient.addColorStop(0.85, '#e8f4f8') // Почти белый у горизонта
-  gradient.addColorStop(1, '#ffffff')    // Белый у земли
-  
-  context.fillStyle = gradient
-  context.fillRect(0, 0, canvas.width, canvas.height)
-  
-  // Создаем текстуру из canvas
-  const skyTexture = new THREE.CanvasTexture(canvas)
-  skyTexture.mapping = THREE.EquirectangularReflectionMapping
-  skyTexture.encoding = THREE.sRGBEncoding
-  
-  // Применяем как environment
-  scene.environment = skyTexture
-  
-  addRealisticLighting()
+  try {
+    // Пытаемся загрузить HDR environment map
+    const hdrTexture = await loadEnvironmentMap()
+    
+    // Применяем HDR текстуру как environment для сцены
+    scene.environment = hdrTexture
+    scene.background = null // Не используем HDR как фон, только для освещения
+    
+    console.log('✓ HDR environment map применена к сцене')
+  } catch (error) {
+    console.warn('⚠ Не удалось загрузить HDR, используем fallback градиент')
+    
+    // Fallback: создаем реалистичный градиент неба
+    const canvas = document.createElement('canvas')
+    canvas.width = 2048
+    canvas.height = 1024
+    const context = canvas.getContext('2d')
+    
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
+    gradient.addColorStop(0, '#0d5e9e')    // Глубокий синий в зените
+    gradient.addColorStop(0.3, '#4a9fd8')  // Средний синий
+    gradient.addColorStop(0.7, '#b8d8f0')  // Светло-синий у горизонта
+    gradient.addColorStop(0.85, '#e8f4f8') // Почти белый у горизонта
+    gradient.addColorStop(1, '#ffffff')    // Белый у земли
+    
+    context.fillStyle = gradient
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    
+    // Создаем текстуру из canvas
+    const skyTexture = new THREE.CanvasTexture(canvas)
+    skyTexture.mapping = THREE.EquirectangularReflectionMapping
+    skyTexture.colorSpace = THREE.SRGBColorSpace
+    
+    // Применяем как environment
+    scene.environment = skyTexture
+    
+    console.log('✓ Применено fallback освещение с градиентом неба')
+  }
   
   // Настройки tone mapping для реалистичной экспозиции
   if (threeBox.renderer) {
     threeBox.renderer.toneMapping = THREE.ACESFilmicToneMapping
     threeBox.renderer.toneMappingExposure = 1.3
-    threeBox.renderer.outputEncoding = THREE.sRGBEncoding
+    threeBox.renderer.outputColorSpace = THREE.SRGBColorSpace
     threeBox.renderer.shadowMap.enabled = true
     threeBox.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     threeBox.renderer.physicallyCorrectLights = true
   }
   
-  console.log('Применено fallback освещение с небом')
+  console.log('✓ Освещение и рендеринг настроены')
 }
 
 // Обновление позиции лоадера
@@ -389,8 +383,12 @@ const add3DModel = () => {
           console.error('✗ Top коллекция не найдена!')
         }
         
-        // Применяем environment map если доступен
-        if (threeBox.scene.environment) {
+        // Применяем HDR environment map к материалам окон
+        if (environmentMap) {
+          console.log('🎨 Применяем HDR environment map к материалам модели')
+          updateModelMaterials(environmentMap)
+        } else if (threeBox.scene.environment) {
+          console.log('🎨 Применяем fallback environment map к материалам модели')
           updateModelMaterials(threeBox.scene.environment)
         }
         
