@@ -78,7 +78,8 @@ body {
 #app {
   width: 100vw;
   height: 100vh;
-  @apply relative w-full h-full;
+  @apply relative;
+  overflow: auto;
 }
 
 /* Карта как фон на весь экран */
