@@ -127,9 +127,9 @@ const updateModelMaterials = (envMap) => {
           const matName = mat.name ? mat.name.toLowerCase() : ''
           
           // Применяем envMap только к стеклу/окнам для отражений
+          mat.envMap = envMap
           if (matName.includes('glass') || matName.includes('window')) {
-            mat.envMap = envMap
-            mat.envMapIntensity = 2; // Set intensity to 0.5
+            // mat.envMapIntensity = 0.5; // Set intensity to 0.5
             // mat.metalness = 0.1
             // mat.roughness = 0.02
             // mat.transparent = true
@@ -144,7 +144,7 @@ const updateModelMaterials = (envMap) => {
           // }
           // Все остальные материалы - без envMap
           else {
-            mat.envMap = null
+            // mat.envMap = null
           }
           
           mat.needsUpdate = true
