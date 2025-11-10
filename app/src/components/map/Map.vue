@@ -29,6 +29,7 @@ import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import modelUrl from '@/assets/models/FutureboxNew.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
+import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
 
 
@@ -625,6 +626,11 @@ const onModelClick = (e) => {
   const intersects = raycaster.intersectObject(model, true)
   
   if (intersects.length > 0) {
+  // Создаем объект здания с локальным изображением
+    const buildingWithImage = {
+      ...props.building,
+      imageSrc: lefortovoImage
+    }
     // Показываем панель здания
     showPanel(props.building)
   }

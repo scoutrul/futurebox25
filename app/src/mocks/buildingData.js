@@ -2,8 +2,11 @@
  * Mock данные для здания и квартир
  */
 
-// Картинка здания (placeholder)
-const buildingImagePlaceholder = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop'
+// Импортируем локальное изображение
+import lefortovoImage from '@/assets/img/lefortovo.jpg'
+
+// Картинка здания (локальная)
+const buildingImagePlaceholder = lefortovoImage
 
 // Картинка плана квартиры (placeholder)
 const apartmentPlanPlaceholder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"%3E%3Crect fill="%23f5f5f5" width="80" height="80"/%3E%3Cpath d="M10 10 L70 10 L70 70 L10 70 Z M10 40 L30 40 M50 40 L70 40" stroke="%23999" stroke-width="2" fill="none"/%3E%3C/svg%3E'
@@ -178,4 +181,3 @@ export const additionalBuildings = [
     email: 'sales@fb.kz'
   }
 ]
-
