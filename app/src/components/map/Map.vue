@@ -50,7 +50,7 @@ const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJt
 
 // Map variables
 let mapBoxGl = null
-let origin = [37.430154, 55.811268]
+let origin = [37.431054, 55.811968]
 let threeBox = null // Threebox instance
 
 let modelRotation = -278
@@ -59,6 +59,7 @@ let model = null
 let modelBottom = null // Reference to bottom collection
 let modelTop = null // Reference to top collection
 let environmentMap = null
+let sunLight = null // Добавляем переменную для света
 
 // Loader state
 const isModelLoading = ref(false)
@@ -69,7 +70,7 @@ const loaderPosition = ref({
   opacity: 0
 })
 
-// Функция загрузки HDR environment map
+// Альтернативный способ - поворот через offset (более простой)
 const loadEnvironmentMap = () => {
   return new Promise((resolve, reject) => {
     const rgbeLoader = new RGBELoader()
@@ -79,16 +80,27 @@ const loadEnvironmentMap = () => {
     rgbeLoader.load(
       environmentUrl,
       (texture) => {
+        console.log('✓ HDR текстура загружена успешно')
+        
+        // Настраиваем текстуру для использования как environment map
         texture.mapping = THREE.EquirectangularReflectionMapping
+        texture.colorSpace = THREE.SRGBColorSpace
+        
+        // Поворачиваем текстуру на 180 градусов через offset
+        texture.offset.x = 0.5 // Сдвиг на половину = поворот на 180°
+        texture.wrapS = THREE.RepeatWrapping
+        texture.wrapT = THREE.RepeatWrapping
+        texture.needsUpdate = true
+        
         environmentMap = texture
-        console.log('✓ HDR environment map успешно загружена')
+        
+        console.log('✓ HDR environment map повернута на 180° через offset')
         resolve(texture)
       },
       (progress) => {
-        // Опционально: отслеживание прогресса загрузки
         if (progress.lengthComputable) {
           const percentComplete = (progress.loaded / progress.total) * 100
-          console.log(`📊 HDR загрузка: ${percentComplete.toFixed(2)}%`)
+          console.log(`📊 Загрузка HDR: ${percentComplete.toFixed(2)}%`)
         }
       },
       (error) => {
@@ -98,7 +110,6 @@ const loadEnvironmentMap = () => {
     )
   })
 }
-
 const findCollectionsByHierarchy = () => {
   if (!model) return
   
@@ -191,8 +202,8 @@ const enhanceModelMaterials = (modelObject) => {
         }
         
         // Убираем эмиссивные свойства
-        material.emissive = new THREE.Color(0x000000)
-        material.emissiveIntensity = 0
+        // material.emissive = new THREE.Color(0x000000)
+        // material.emissiveIntensity = 0
         
         material.needsUpdate = true
       })
@@ -200,6 +211,37 @@ const enhanceModelMaterials = (modelObject) => {
   })
   
   console.log('Материалы модели улучшены')
+}
+// Опциональная функция для добавления плоскости земли (если нужны тени на земле)
+const addGroundPlane = () => {
+  if (!threeBox) return
+  
+  // Создаем невидимую плоскость для приема теней
+  const groundGeometry = new THREE.PlaneGeometry(400, 400) // Увеличиваем размер
+  const groundMaterial = new THREE.ShadowMaterial({
+    opacity: 0.3,
+    color: 0x000000
+  })
+  
+  const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial)
+  groundPlane.rotation.x = -Math.PI / 2
+  groundPlane.receiveShadow = true
+  groundPlane.castShadow = false
+  
+  // ВАЖНО: Используем Threebox Object3D для правильной синхронизации с картой
+  const groundObject = threeBox.Object3D({
+    obj: groundPlane,
+    units: 'meters',
+    anchor: 'center'
+  })
+  
+  // Устанавливаем координаты (привязываем к карте)
+  groundObject.setCoords(origin)
+  
+  // Добавляем в сцену через Threebox
+  threeBox.add(groundObject)
+  
+  console.log('✓ Добавлена плоскость земли для теней')
 }
 
 // Обновленная функция создания fallback освещения
@@ -214,52 +256,145 @@ const addFallbackLightingWithSky = async () => {
     
     // Применяем HDR текстуру как environment для сцены
     scene.environment = hdrTexture
-    scene.background = null // Не используем HDR как фон, только для освещения
+    scene.background = null
     
     console.log('✓ HDR environment map применена к сцене')
   } catch (error) {
     console.warn('⚠ Не удалось загрузить HDR, используем fallback градиент')
     
-    // Fallback: создаем реалистичный градиент неба
+    // ... existing gradient code ...
     const canvas = document.createElement('canvas')
     canvas.width = 2048
     canvas.height = 1024
     const context = canvas.getContext('2d')
     
     const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
-    gradient.addColorStop(0, '#0d5e9e')    // Глубокий синий в зените
-    gradient.addColorStop(0.3, '#4a9fd8')  // Средний синий
-    gradient.addColorStop(0.7, '#b8d8f0')  // Светло-синий у горизонта
-    gradient.addColorStop(0.85, '#e8f4f8') // Почти белый у горизонта
-    gradient.addColorStop(1, '#ffffff')    // Белый у земли
+    gradient.addColorStop(0, '#0d5e9e')
+    gradient.addColorStop(0.3, '#4a9fd8')
+    gradient.addColorStop(0.7, '#b8d8f0')
+    gradient.addColorStop(0.85, '#e8f4f8')
+    gradient.addColorStop(1, '#ffffff')
     
     context.fillStyle = gradient
     context.fillRect(0, 0, canvas.width, canvas.height)
     
-    // Создаем текстуру из canvas
     const skyTexture = new THREE.CanvasTexture(canvas)
     skyTexture.mapping = THREE.EquirectangularReflectionMapping
     skyTexture.colorSpace = THREE.SRGBColorSpace
     
-    // Применяем как environment
     scene.environment = skyTexture
     
     console.log('✓ Применено fallback освещение с градиентом неба')
   }
+
+  // Добавляем направленный свет для теней (солнце)
+  sunLight = new THREE.DirectionalLight(0xffffff, 1.5)
+  sunLight.position.set(50, 100, 50)
+  sunLight.castShadow = true
+  
+  // Настройка теней для направленного света
+  sunLight.shadow.mapSize.width = 4096
+  sunLight.shadow.mapSize.height = 4096
+  sunLight.shadow.camera.near = 0.5
+  sunLight.shadow.camera.far = 500
+  
+  // Размер области теней
+  const shadowSize = 150
+  sunLight.shadow.camera.left = -shadowSize
+  sunLight.shadow.camera.right = shadowSize
+  sunLight.shadow.camera.top = shadowSize
+  sunLight.shadow.camera.bottom = -shadowSize
+  
+  // Настройки качества теней
+  sunLight.shadow.bias = -0.001
+  sunLight.shadow.normalBias = 0.02
+  
+  scene.add(sunLight)
+  
+  console.log('✓ Добавлено освещение с тенями')
   
   // Настройки tone mapping для реалистичной экспозиции
   if (threeBox.renderer) {
     threeBox.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    threeBox.renderer.toneMappingExposure = 1.3
+    threeBox.renderer.toneMappingExposure = 1
     threeBox.renderer.outputColorSpace = THREE.SRGBColorSpace
+    
+    // Включаем тени в рендерере
     threeBox.renderer.shadowMap.enabled = true
     threeBox.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    threeBox.renderer.physicallyCorrectLights = true
+    threeBox.renderer.shadowMap.autoUpdate = true
   }
   
   console.log('✓ Освещение и рендеринг настроены')
 }
 
+// Функция обновления позиции света относительно модели
+const updateSunLightPosition = () => {
+  if (!sunLight || !model || !mapBoxGl) return
+  
+  // Получаем мировую позицию модели
+  const modelWorldPosition = new THREE.Vector3()
+  model.getWorldPosition(modelWorldPosition)
+  
+  // Получаем текущий зум
+  const zoom = mapBoxGl.getZoom()
+  
+  // Масштаб сцены Threebox зависит от зума
+  // При зуме 16 масштаб = 1, при зуме 17 масштаб = 2, и т.д.
+  const sceneScale = Math.pow(2, zoom - 16)
+  
+  // Базовые параметры (для зума 16)
+  const baseShadowSize = 150
+  const baseLightDistance = 100
+  
+  // Масштабируем параметры в зависимости от зума
+  // При приближении (больший зум) все увеличивается пропорционально
+  const shadowSize = baseShadowSize * sceneScale
+  const lightDistance = baseLightDistance * sceneScale
+  
+  // Позиционируем свет относительно модели
+  sunLight.position.set(
+    modelWorldPosition.x + lightDistance * 0.5,
+    modelWorldPosition.y + lightDistance,
+    modelWorldPosition.z + lightDistance * 0.5
+  )
+  
+  // Направляем свет на модель
+  if (!sunLight.target.parent) {
+    threeBox.scene.add(sunLight.target)
+  }
+  sunLight.target.position.copy(modelWorldPosition)
+  sunLight.target.updateMatrixWorld()
+  
+  // Обновляем размеры камеры теней
+  sunLight.shadow.camera.left = -shadowSize
+  sunLight.shadow.camera.right = shadowSize
+  sunLight.shadow.camera.top = shadowSize
+  sunLight.shadow.camera.bottom = -shadowSize
+  
+  // Расстояние от света до модели
+  const distanceToModel = sunLight.position.distanceTo(modelWorldPosition)
+  
+  // near и far должны охватывать всю область теней
+  // near - начинается немного перед моделью
+  // far - заканчивается за моделью с запасом
+  sunLight.shadow.camera.near = Math.max(1, distanceToModel - shadowSize * 1.5)
+  sunLight.shadow.camera.far = distanceToModel + shadowSize * 1.5
+  
+  // Обновляем камеру теней
+  sunLight.shadow.camera.updateProjectionMatrix()
+  
+  // Для отладки
+  console.log('Shadow camera update:', { 
+    zoom: zoom.toFixed(2), 
+    sceneScale: sceneScale.toFixed(2),
+    shadowSize: shadowSize.toFixed(2), 
+    lightDistance: lightDistance.toFixed(2),
+    near: sunLight.shadow.camera.near.toFixed(2),
+    far: sunLight.shadow.camera.far.toFixed(2),
+    distanceToModel: distanceToModel.toFixed(2)
+  })
+}
 // Обновление позиции лоадера
 const updateLoaderPosition = () => {
   if (!mapBoxGl) return
@@ -286,6 +421,15 @@ const add3DModel = () => {
   // Обновляем позицию лоадера при движении карты
   mapBoxGl.on('move', updateLoaderPosition)
   mapBoxGl.on('zoom', updateLoaderPosition)
+  
+  // КРИТИЧЕСКИ ВАЖНО: Патчим THREE.Object3D ПЕРЕД инициализацией Threebox
+  // Это гарантирует, что у всех объектов будет метод onBuild
+  if (!THREE.Object3D.prototype.onBuild) {
+    console.log('🔧 Добавляем метод onBuild в прототип THREE.Object3D')
+    THREE.Object3D.prototype.onBuild = function() {
+      // Пустая функция для совместимости с Threebox
+    }
+  }
   
   // Инициализируем Threebox
   threeBox = window.tb = new Threebox(
@@ -322,8 +466,12 @@ const add3DModel = () => {
       tooltip: false
     }, function (loadedModel) {
       console.log('Callback загрузки модели вызван', loadedModel ? 'успешно' : 'с ошибкой')
+      
       if (loadedModel) {
         model = loadedModel
+        
+        console.log('✓ Модель загружена, onBuild уже есть у всех объектов через прототип')
+        
         model.userData.selectEnabled = false
         
         // Ищем и сохраняем ссылки на коллекции bottom и top
@@ -351,6 +499,11 @@ const add3DModel = () => {
           // Устанавливаем свойства рендеринга для всех мешей
           if (child.isMesh) {
             child.renderOrder = 999
+            
+            // Включаем тени
+            child.castShadow = true
+            child.receiveShadow = true
+            
             if (child.material) {
               if (Array.isArray(child.material)) {
                 child.material.forEach(mat => {
@@ -396,8 +549,14 @@ const add3DModel = () => {
         // Улучшаем материалы
         enhanceModelMaterials(model)
         
+        // Добавляем модель в сцену
+        console.log('➕ Добавляем модель в сцену...')
         threeBox.add(model)
         model.setCoords(origin)
+        console.log('✓ Модель добавлена в сцену')
+
+        // Добавляем плоскость земли для теней (опционально)
+        addGroundPlane()
         
         // Добавляем обработчик клика на модель
         model.addTooltip = function() {} // Отключаем стандартный тултип
@@ -424,9 +583,9 @@ const add3DModel = () => {
         
         mapBoxGl.triggerRepaint()
         
-        console.log('Модель успешно загружена')
+        console.log('✓ Модель успешно загружена и добавлена в сцену')
       } else {
-        console.error('Не удалось загрузить модель')
+        console.error('✗ Не удалось загрузить модель')
         isModelLoading.value = false
         
         // Отключаем обновление позиции лоадера
@@ -435,7 +594,7 @@ const add3DModel = () => {
       }
     })
   } catch (error) {
-    console.error('Ошибка при загрузке модели:', error)
+    console.error('✗ Ошибка при загрузке модели:', error)
     isModelLoading.value = false
     
     // Отключаем обновление позиции лоадера
@@ -443,7 +602,6 @@ const add3DModel = () => {
     mapBoxGl.off('zoom', updateLoaderPosition)
   }
 }
-
 const initializeMap = () => {
   // Mapbox access token
   mapboxgl.accessToken = accessToken
@@ -573,31 +731,44 @@ const initializeMap = () => {
       }
     }
     
-    // Проверяем, не существует ли уже слой
-    if (!mapBoxGl.getLayer('custom-threebox-layer')) {
-      // Добавляем custom 3D layer ПЕРЕД первым symbol layer
-      // Это делает его видимым поверх 3D зданий
-      mapBoxGl.addLayer({
-        id: 'custom-threebox-layer',
-        type: 'custom',
-        renderingMode: '3d',
-        onAdd: function() {
-          add3DModel()
-        },
-        render: function() {
-          if (threeBox) {
-            // Сбрасываем состояние WebGL перед рендером (как в официальном примере Mapbox)
-            if (threeBox.renderer) {
-              threeBox.renderer.resetState()
-            }
-            threeBox.update()
-            mapBoxGl.triggerRepaint()
-          }
+// Проверяем, не существует ли уже слой
+if (!mapBoxGl.getLayer('custom-threebox-layer')) {
+  // Добавляем custom 3D layer ПЕРЕД первым symbol layer
+  mapBoxGl.addLayer({
+    id: 'custom-threebox-layer',
+    type: 'custom',
+    renderingMode: '3d',
+    onAdd: function(map, gl) {
+      add3DModel()
+    },
+    render: function(gl, matrix) {
+      if (threeBox) {
+        // Обновляем позицию света перед рендером
+        updateSunLightPosition()
+        
+        // Обновляем матрицы перед рендером
+        if (model) {
+          model.updateMatrixWorld(true)
         }
-      }, firstSymbolId) // Вставляем перед первым symbol layer
-      
-      console.log('Custom 3D layer добавлен перед symbol layer:', firstSymbolId)
+        
+        // Сбрасываем состояние WebGL перед рендером
+        if (threeBox.renderer) {
+          threeBox.renderer.resetState()
+        }
+        
+        threeBox.update()
+        mapBoxGl.triggerRepaint()
+      }
+    },
+    // Добавляем метод onRemove для правильной очистки
+    onRemove: function() {
+      if (threeBox) {
+        threeBox.clear()
+      }
     }
+  }, firstSymbolId)   
+  console.log('Custom 3D layer добавлен перед symbol layer:', firstSymbolId)
+}
   })
 }
 
