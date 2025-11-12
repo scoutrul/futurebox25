@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
@@ -61,6 +61,18 @@ let modelTop = null // Reference to top collection
 let environmentMap = null
 let sunLight = null // Добавляем переменную для света
 
+// Добавьте эти переменные в начало скрипта (после других переменных)
+let animationFrameId = null
+let lastRenderTime = 0
+const targetFPS = 30 // Целевой FPS для оптимизации
+const frameInterval = 1000 // targetFPS
+// Переменные для обработчиков событий
+let canvas = null
+let mouseDownHandler = null
+let mouseMoveHandler = null
+let mouseUpHandler = null
+let contextMenuHandler = null
+
 // Loader state
 const isModelLoading = ref(false)
 const loaderPosition = ref({
@@ -70,7 +82,6 @@ const loaderPosition = ref({
   opacity: 0
 })
 
-// Альтернативный способ - поворот через offset (более простой)
 const loadEnvironmentMap = () => {
   return new Promise((resolve, reject) => {
     const rgbeLoader = new RGBELoader()
@@ -86,15 +97,37 @@ const loadEnvironmentMap = () => {
         texture.mapping = THREE.EquirectangularReflectionMapping
         texture.colorSpace = THREE.SRGBColorSpace
         
-        // Поворачиваем текстуру на 180 градусов через offset
-        texture.offset.x = 0.5 // Сдвиг на половину = поворот на 180°
+        // Fix the rotation using offset
+        // texture.offset.set(0.5, 0)  // 180° поворот
+        
+        // НОВОЕ: Уменьшаем масштаб отражения (делаем его более "далеким")
+        // Значения больше 1 = отражение становится мельче (более далеким)
+        // Значения меньше 1 = отражение становится крупнее (более близким)
+        // texture.repeat.set(8, 8)  // Попробуйте разные значения: 1.5, 2, 3, 4
+        
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
         texture.needsUpdate = true
         
         environmentMap = texture
         
-        console.log('✓ HDR environment map повернута на 180° через offset')
+        // ВАЖНО: Если модель уже загружена, обновляем её материалы
+        if (model) {
+          console.log('🔄 Обновляем материалы модели с новым environment map')
+          updateModelMaterials(texture)
+          
+          // Обновляем сцену
+          if (threeBox && threeBox.scene) {
+            threeBox.scene.environment = texture
+          }
+          
+          // Форсируем перерисовку
+          if (mapBoxGl) {
+            mapBoxGl.triggerRepaint()
+          }
+        }
+        
+        console.log('✓ HDR environment map настроена с offset:', texture.offset, 'и repeat:', texture.repeat)
         resolve(texture)
       },
       (progress) => {
@@ -125,9 +158,12 @@ const findCollectionsByHierarchy = () => {
   }
 }
 
-
 const updateModelMaterials = (envMap) => {
   if (!model) return
+  
+  console.log('🎨 Обновляем материалы модели с environment map')
+  
+  let updatedCount = 0
   
   model.traverse(child => {
     if (child.isMesh && child.material) {
@@ -135,51 +171,63 @@ const updateModelMaterials = (envMap) => {
       
       materials.forEach(mat => {
         if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+          // Применяем envMap ко всем материалам
+          mat.envMap = envMap
+          mat.needsUpdate = true
+          updatedCount++
+          
           const matName = mat.name ? mat.name.toLowerCase() : ''
           
-          // Применяем envMap только к стеклу/окнам для отражений
-          mat.envMap = envMap
+          // Настройки для стекла/окон
           if (matName.includes('glass') || matName.includes('window')) {
-            // mat.envMapIntensity = 0.5; // Set intensity to 0.5
+            mat.envMap = envMap
+            mat.envMapIntensity = 1.0
             // mat.metalness = 0.1
             // mat.roughness = 0.02
-            // mat.transparent = true
-            // mat.opacity = 0.5
-            // mat.color.setHex(0xDDEEFF)
           }
-          // Металл/алюминий - тоже получает отражения
-          // else if (matName.includes('metal') || matName.includes('aluminum')) {
-          //   mat.envMap = envMap
-          //   mat.metalness = 0.8
-          //   mat.roughness = 0.2
-          // }
-          // Все остальные материалы - без envMap
+          // Настройки для металла
+          else if (matName.includes('metal') || matName.includes('aluminum')) {
+            mat.envMapIntensity = 1.0
+            // mat.metalness = 0.8
+            // mat.roughness = 0.2
+          }
+          // Настройки для остальных материалов
           else {
-            // mat.envMap = null
+            mat.envMapIntensity = 0.5
           }
-          
-          mat.needsUpdate = true
         }
       })
     }
   })
   
-  console.log('Материалы обновлены с environment map')
+  console.log(`✓ Обновлено ${updatedCount} материалов с environment map`)
 }
-
+// Оптимизация материалов модели
 const enhanceModelMaterials = (modelObject) => {
   if (!modelObject) return
   
+  let meshCount = 0
+  let materialCount = 0
+  
   modelObject.traverse(child => {
     if (child.isMesh && child.material) {
+      meshCount++
+      
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       
       materials.forEach(material => {
-        // Включаем тени
-        child.castShadow = true
-        child.receiveShadow = true
+        materialCount++
         
-        // Конвертируем в PBR материал если нужно
+        // Включаем тени только для важных объектов
+        // child.castShadow = true
+        // child.receiveShadow = true
+        
+        // Оптимизация frustum culling
+        child.frustumCulled = true
+        
+        // КРИТИЧЕСКИ ВАЖНО: Устанавливаем renderOrder для предотвращения мерцания
+        child.renderOrder = 1
+        
         if (!(material.isMeshStandardMaterial || material.isMeshPhysicalMaterial)) {
           const originalColor = material.color ? material.color.clone() : new THREE.Color(0xffffff)
           
@@ -189,7 +237,17 @@ const enhanceModelMaterials = (modelObject) => {
             normalMap: material.normalMap,
             roughnessMap: material.roughnessMap,
             metalnessMap: material.metalnessMap,
-            aoMap: material.aoMap
+            aoMap: material.aoMap,
+            // Оптимизации материала
+            flatShading: false,
+            precision: 'highp', // Высокая точность для предотвращения z-fighting
+            // КРИТИЧЕСКИ ВАЖНО: Настройки depth для предотвращения мерцания
+            depthTest: true,
+            depthWrite: true,
+            // Polygon offset для предотвращения z-fighting
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1
           })
           
           if (Array.isArray(child.material)) {
@@ -199,62 +257,68 @@ const enhanceModelMaterials = (modelObject) => {
             child.material = newMaterial
           }
           material = newMaterial
+        } else {
+          // КРИТИЧЕСКИ ВАЖНО: Настройки существующих материалов для предотвращения мерцания
+          material.depthTest = true
+          material.depthWrite = true
+          material.precision = 'highp'
+          
+          // Polygon offset для предотвращения z-fighting
+          material.polygonOffset = true
+          material.polygonOffsetFactor = 1
+          material.polygonOffsetUnits = 1
+          
+          // Для прозрачных материалов
+          if (material.transparent || material.opacity < 1) {
+            material.depthWrite = false
+            material.side = THREE.DoubleSide
+            // Увеличиваем polygonOffset для прозрачных материалов
+            material.polygonOffsetFactor = 2
+            material.polygonOffsetUnits = 2
+          }
         }
-        
-        // Убираем эмиссивные свойства
-        // material.emissive = new THREE.Color(0x000000)
-        // material.emissiveIntensity = 0
         
         material.needsUpdate = true
       })
     }
   })
   
-  console.log('Материалы модели улучшены')
+  console.log(`✓ Оптимизировано ${meshCount} мешей и ${materialCount} материалов`)
 }
-// Опциональная функция для добавления плоскости земли (если нужны тени на земле)
+// Оптимизированная функция для добавления плоскости земли
 const addGroundPlane = () => {
-  if (!threeBox) return
+  if (!threeBox || !threeBox.world) return
   
-  // Создаем невидимую плоскость для приема теней
-  const groundGeometry = new THREE.PlaneGeometry(400, 400) // Увеличиваем размер
-  const groundMaterial = new THREE.ShadowMaterial({
-    opacity: 0.3,
-    color: 0x000000
-  })
-  
-  const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial)
-  groundPlane.rotation.x = -Math.PI / 2
-  groundPlane.receiveShadow = true
-  groundPlane.castShadow = false
-  
-  // ВАЖНО: Используем Threebox Object3D для правильной синхронизации с картой
-  const groundObject = threeBox.Object3D({
-    obj: groundPlane,
-    units: 'meters',
-    anchor: 'center'
-  })
-  
-  // Устанавливаем координаты (привязываем к карте)
-  groundObject.setCoords(origin)
-  
-  // Добавляем в сцену через Threebox
-  threeBox.add(groundObject)
-  
-  console.log('✓ Добавлена плоскость земли для теней')
+  try {
+    // Уменьшаем размер плоскости для оптимизации
+    const groundGeometry = new THREE.PlaneGeometry(200, 200, 1, 1) // Убрали сегментацию
+    const groundMaterial = new THREE.ShadowMaterial({
+      opacity: 0.8,
+      color: 0x000000
+    })
+    
+    const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial)
+    groundPlane.rotation.x = -Math.PI / 2
+    groundPlane.receiveShadow = true
+    groundPlane.castShadow = false
+    
+    groundPlane.position.set(0, -0.5, 0)
+    
+    threeBox.world.add(groundPlane)
+    
+    console.log('✓ Добавлена оптимизированная плоскость земли')
+  } catch (error) {
+    console.warn('⚠ Не удалось добавить плоскость земли:', error.message)
+  }
 }
-
-// Обновленная функция создания fallback освещения
+// Оптимизированная функция освещения
 const addFallbackLightingWithSky = async () => {
   if (!threeBox) return
   
   const scene = threeBox.scene
   
   try {
-    // Пытаемся загрузить HDR environment map
     const hdrTexture = await loadEnvironmentMap()
-    
-    // Применяем HDR текстуру как environment для сцены
     scene.environment = hdrTexture
     scene.background = null
     
@@ -262,10 +326,10 @@ const addFallbackLightingWithSky = async () => {
   } catch (error) {
     console.warn('⚠ Не удалось загрузить HDR, используем fallback градиент')
     
-    // ... existing gradient code ...
+    // Уменьшаем разрешение градиента для оптимизации
     const canvas = document.createElement('canvas')
-    canvas.width = 2048
-    canvas.height = 1024
+    canvas.width = 1024 // Было 2048
+    canvas.height = 512  // Было 1024
     const context = canvas.getContext('2d')
     
     const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
@@ -284,117 +348,101 @@ const addFallbackLightingWithSky = async () => {
     
     scene.environment = skyTexture
     
-    console.log('✓ Применено fallback освещение с градиентом неба')
+    console.log('✓ Применено оптимизированное fallback освещение')
   }
-
-  // Добавляем направленный свет для теней (солнце)
-  sunLight = new THREE.DirectionalLight(0xffffff, 1.5)
+  
+  // Оптимизированные настройки света
+  sunLight = new THREE.DirectionalLight(0xffffff, 1.0)
   sunLight.position.set(50, 100, 50)
   sunLight.castShadow = true
   
-  // Настройка теней для направленного света
-  sunLight.shadow.mapSize.width = 4096
-  sunLight.shadow.mapSize.height = 4096
+  // Уменьшаем разрешение теней для производительности
+  sunLight.shadow.mapSize.width = 1024  // Было 8192
+  sunLight.shadow.mapSize.height = 1024 // Было 8192
   sunLight.shadow.camera.near = 0.5
   sunLight.shadow.camera.far = 500
   
-  // Размер области теней
   const shadowSize = 150
   sunLight.shadow.camera.left = -shadowSize
   sunLight.shadow.camera.right = shadowSize
   sunLight.shadow.camera.top = shadowSize
   sunLight.shadow.camera.bottom = -shadowSize
   
-  // Настройки качества теней
   sunLight.shadow.bias = -0.001
-  sunLight.shadow.normalBias = 0.02
+  sunLight.shadow.normalBias = 0.005
+  sunLight.shadow.radius = 2
   
   scene.add(sunLight)
   
-  console.log('✓ Добавлено освещение с тенями')
+  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5)
+  scene.add(ambientLight)
   
-  // Настройки tone mapping для реалистичной экспозиции
+  console.log('✓ Добавлено оптимизированное освещение')
+  
   if (threeBox.renderer) {
     threeBox.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    threeBox.renderer.toneMappingExposure = 1
+    threeBox.renderer.toneMappingExposure = 1.2
     threeBox.renderer.outputColorSpace = THREE.SRGBColorSpace
     
-    // Включаем тени в рендерере
+    // Оптимизированные настройки теней
     threeBox.renderer.shadowMap.enabled = true
     threeBox.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    threeBox.renderer.shadowMap.autoUpdate = true
+    threeBox.renderer.shadowMap.autoUpdate = false // Отключаем автообновление
+    
+    // Дополнительные оптимизации рендерера
+    threeBox.renderer.powerPreference = 'high-performance'
+    threeBox.renderer.precision = 'mediump' // Средняя точность вместо высокой
+    
+    console.log('✓ Рендерер оптимизирован для производительности')
   }
-  
-  console.log('✓ Освещение и рендеринг настроены')
 }
 
-// Функция обновления позиции света относительно модели
+// Оптимизированная функция обновления позиции света
 const updateSunLightPosition = () => {
   if (!sunLight || !model || !mapBoxGl) return
   
-  // Получаем мировую позицию модели
   const modelWorldPosition = new THREE.Vector3()
   model.getWorldPosition(modelWorldPosition)
   
-  // Получаем текущий зум
   const zoom = mapBoxGl.getZoom()
-  
-  // Масштаб сцены Threebox зависит от зума
-  // При зуме 16 масштаб = 1, при зуме 17 масштаб = 2, и т.д.
   const sceneScale = Math.pow(2, zoom - 16)
   
-  // Базовые параметры (для зума 16)
   const baseShadowSize = 150
   const baseLightDistance = 100
   
-  // Масштабируем параметры в зависимости от зума
-  // При приближении (больший зум) все увеличивается пропорционально
   const shadowSize = baseShadowSize * sceneScale
   const lightDistance = baseLightDistance * sceneScale
   
-  // Позиционируем свет относительно модели
   sunLight.position.set(
     modelWorldPosition.x + lightDistance * 0.5,
     modelWorldPosition.y + lightDistance,
     modelWorldPosition.z + lightDistance * 0.5
   )
   
-  // Направляем свет на модель
   if (!sunLight.target.parent) {
     threeBox.scene.add(sunLight.target)
   }
   sunLight.target.position.copy(modelWorldPosition)
   sunLight.target.updateMatrixWorld()
   
-  // Обновляем размеры камеры теней
   sunLight.shadow.camera.left = -shadowSize
   sunLight.shadow.camera.right = shadowSize
   sunLight.shadow.camera.top = shadowSize
   sunLight.shadow.camera.bottom = -shadowSize
   
-  // Расстояние от света до модели
   const distanceToModel = sunLight.position.distanceTo(modelWorldPosition)
   
-  // near и far должны охватывать всю область теней
-  // near - начинается немного перед моделью
-  // far - заканчивается за моделью с запасом
   sunLight.shadow.camera.near = Math.max(1, distanceToModel - shadowSize * 1.5)
   sunLight.shadow.camera.far = distanceToModel + shadowSize * 1.5
   
-  // Обновляем камеру теней
   sunLight.shadow.camera.updateProjectionMatrix()
   
-  // Для отладки
-  console.log('Shadow camera update:', { 
-    zoom: zoom.toFixed(2), 
-    sceneScale: sceneScale.toFixed(2),
-    shadowSize: shadowSize.toFixed(2), 
-    lightDistance: lightDistance.toFixed(2),
-    near: sunLight.shadow.camera.near.toFixed(2),
-    far: sunLight.shadow.camera.far.toFixed(2),
-    distanceToModel: distanceToModel.toFixed(2)
-  })
+  // Обновляем тени только при необходимости
+  if (threeBox.renderer && threeBox.renderer.shadowMap.autoUpdate === false) {
+    threeBox.renderer.shadowMap.needsUpdate = true
+  }
 }
+
 // Обновление позиции лоадера
 const updateLoaderPosition = () => {
   if (!mapBoxGl) return
@@ -410,28 +458,154 @@ const updateLoaderPosition = () => {
   }
 }
 
-// Загрузка и добавление 3D модели (из примера map.js)
+// Функция очистки ресурсов
+const cleanup = () => {
+  console.log('🧹 Начинаем очистку ресурсов...')
+  
+  // Удаляем обработчики событий с canvas
+  if (canvas) {
+    if (mouseDownHandler) canvas.removeEventListener('mousedown', mouseDownHandler)
+    if (mouseMoveHandler) canvas.removeEventListener('mousemove', mouseMoveHandler)
+    if (mouseUpHandler) canvas.removeEventListener('mouseup', mouseUpHandler)
+    if (contextMenuHandler) canvas.removeEventListener('contextmenu', contextMenuHandler)
+  }
+  
+  // Удаляем обработчики событий карты
+  if (mapBoxGl) {
+    if (handleModelClick) mapBoxGl.off('click', handleModelClick)
+    if (handleMouseMove) mapBoxGl.off('mousemove', handleMouseMove)
+    mapBoxGl.off('move', updateLoaderPosition)
+    mapBoxGl.off('zoom', updateLoaderPosition)
+  }
+  
+  // Отменяем анимацию
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+    animationFrameId = null
+  }
+  
+  // Очищаем Threebox
+  if (threeBox) {
+    try {
+      threeBox.clear()
+      threeBox.dispose()
+    } catch (error) {
+      console.warn('⚠ Ошибка при очистке Threebox:', error.message)
+    }
+    threeBox = null
+  }
+  
+  // Удаляем карту
+  if (mapBoxGl) {
+    try {
+      mapBoxGl.remove()
+    } catch (error) {
+      console.warn('⚠ Ошибка при удалении карты:', error.message)
+    }
+    mapBoxGl = null
+  }
+  
+  // Очищаем ссылки
+  canvas = null
+  model = null
+  modelBottom = null
+  modelTop = null
+  environmentMap = null
+  sunLight = null
+  handleModelClick = null
+  handleMouseMove = null
+  mouseDownHandler = null
+  mouseMoveHandler = null
+  mouseUpHandler = null
+  contextMenuHandler = null
+  
+  console.log('✓ Очистка ресурсов завершена')
+}
+
+
+// КРИТИЧЕСКИ ВАЖНО: Оптимизированная функция рендеринга без мерцания
+const optimizedRender = (gl, matrix) => {
+  if (!threeBox) return
+  
+  // ВАЖНО: Сохраняем состояние WebGL перед рендерингом Three.js
+  const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM)
+  const currentBlend = gl.getParameter(gl.BLEND)
+  const currentDepthTest = gl.getParameter(gl.DEPTH_TEST)
+  const currentCullFace = gl.getParameter(gl.CULL_FACE)
+  const currentDepthFunc = gl.getParameter(gl.DEPTH_FUNC)
+  const currentBlendSrc = gl.getParameter(gl.BLEND_SRC_RGB)
+  const currentBlendDst = gl.getParameter(gl.BLEND_DST_RGB)
+  
+  // Обновляем позицию света только при необходимости
+  updateSunLightPosition()
+  
+  // Обновляем матрицы
+  if (model) {
+    model.updateMatrixWorld(true)
+  }
+  
+  // КРИТИЧЕСКИ ВАЖНО: Настраиваем WebGL состояние для Three.js
+  gl.enable(gl.DEPTH_TEST)
+  gl.depthFunc(gl.LEQUAL)
+  gl.enable(gl.BLEND)
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+  
+  // КРИТИЧЕСКИ ВАЖНО: Очищаем только depth buffer, не color buffer
+  // Это предотвращает мерцание при взаимодействии с картой
+  gl.clear(gl.DEPTH_BUFFER_BIT)
+  
+  // Рендерим сцену Three.js
+  threeBox.update()
+  
+  // ВАЖНО: Восстанавливаем состояние WebGL для Mapbox
+  // Это критично для предотвращения конфликтов рендеринга
+  if (currentProgram) {
+    gl.useProgram(currentProgram)
+  }
+  
+  if (currentBlend) {
+    gl.enable(gl.BLEND)
+  } else {
+    gl.disable(gl.BLEND)
+  }
+  
+  if (currentDepthTest) {
+    gl.enable(gl.DEPTH_TEST)
+  } else {
+    gl.disable(gl.DEPTH_TEST)
+  }
+  
+  if (currentCullFace) {
+    gl.enable(gl.CULL_FACE)
+  } else {
+    gl.disable(gl.CULL_FACE)
+  }
+  
+  // Восстанавливаем функцию глубины
+  if (currentDepthFunc) {
+    gl.depthFunc(currentDepthFunc)
+  }
+  
+  // Восстанавливаем blend функции
+  if (currentBlendSrc && currentBlendDst) {
+    gl.blendFunc(currentBlendSrc, currentBlendDst)
+  }
+}
+// Загрузка и добавление 3D модели
 const add3DModel = () => {
   console.log("Загрузка 3D модели по адресу:", origin)
   
-  // Показываем лоадер
   isModelLoading.value = true
   updateLoaderPosition()
   
-  // Обновляем позицию лоадера при движении карты
   mapBoxGl.on('move', updateLoaderPosition)
   mapBoxGl.on('zoom', updateLoaderPosition)
   
-  // КРИТИЧЕСКИ ВАЖНО: Патчим THREE.Object3D ПЕРЕД инициализацией Threebox
-  // Это гарантирует, что у всех объектов будет метод onBuild
   if (!THREE.Object3D.prototype.onBuild) {
     console.log('🔧 Добавляем метод onBuild в прототип THREE.Object3D')
-    THREE.Object3D.prototype.onBuild = function() {
-      // Пустая функция для совместимости с Threebox
-    }
+    THREE.Object3D.prototype.onBuild = function() {}
   }
   
-  // Инициализируем Threebox
   threeBox = window.tb = new Threebox(
     mapBoxGl,
     mapBoxGl.getCanvas().getContext('webgl'),
@@ -444,17 +618,25 @@ const add3DModel = () => {
     }
   )
   
-  // Настраиваем renderer для правильной работы с ресайзом
+  // КРИТИЧЕСКИ ВАЖНО: Настройки renderer для предотвращения мерцания
   if (threeBox.renderer) {
     threeBox.renderer.autoClear = false
+    threeBox.renderer.sortObjects = true // Включаем сортировку объектов
+    
+    // Настройки для предотвращения z-fighting
+    const gl = threeBox.renderer.getContext()
+    gl.enable(gl.DEPTH_TEST)
+    gl.depthFunc(gl.LEQUAL)
+    
+    // Настройки для правильной работы с прозрачностью
+    threeBox.renderer.sortObjects = true
+    threeBox.renderer.preserveDrawingBuffer = true
   }
   
-  // Добавляем environment map для отражений и освещения
   addFallbackLightingWithSky()
   
   console.log('Начинаем загрузку модели...', modelUrl)
   
-  // Загружаем 3D модель
   try {
     threeBox.loadObj({
       obj: modelUrl,
@@ -470,7 +652,7 @@ const add3DModel = () => {
       if (loadedModel) {
         model = loadedModel
         
-        console.log('✓ Модель загружена, onBuild уже есть у всех объектов через прототип')
+        console.log('✓ Модель загружена, начинаем оптимизацию...')
         
         model.userData.selectEnabled = false
         
@@ -478,53 +660,62 @@ const add3DModel = () => {
         model.traverse((child) => {
           const childName = child.name.toLowerCase()
           
-          // Проверка на bottom коллекцию
           if (childName.includes('bottom') || 
               childName.includes('base') ||
               childName.includes('lower') ||
               childName === 'bottom') {
             modelBottom = child
-            console.log('✓ Найдена BOTTOM коллекция:', child.name)
+            // console.log('✓ Найдена BOTTOM коллекция:', child.name)
           }
           
-          // Проверка на top коллекцию
           if (childName.includes('top') || 
               childName.includes('upper') ||
               childName.includes('roof') ||
               childName === 'top') {
             modelTop = child
-            console.log('✓ Найдена TOP коллекция:', child.name)
+            // console.log('✓ Найдена TOP коллекция:', child.name)
           }
           
-          // Устанавливаем свойства рендеринга для всех мешей
+          // КРИТИЧЕСКИ ВАЖНО: Настройки для предотвращения мерцания
           if (child.isMesh) {
-            child.renderOrder = 999
+            // Устанавливаем правильный renderOrder
+            child.renderOrder = 1
             
-            // Включаем тени
             child.castShadow = true
             child.receiveShadow = true
+            child.frustumCulled = true
             
             if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach(mat => {
-                  mat.depthTest = true
-                  mat.depthWrite = true
-                })
-              } else {
-                child.material.depthTest = true
-                child.material.depthWrite = true
-              }
+              const materials = Array.isArray(child.material) ? child.material : [child.material]
+              
+              materials.forEach(mat => {
+                // КРИТИЧЕСКИ ВАЖНО: Настройки материала для предотвращения мерцания
+                mat.depthTest = true
+                mat.depthWrite = true
+                mat.precision = 'highp' // Высокая точность для предотвращения z-fighting
+                
+                // Для прозрачных материалов
+                if (mat.transparent || mat.opacity < 1) {
+                  mat.depthWrite = false // Отключаем запись в буфер глубины для прозрачных
+                  mat.side = THREE.DoubleSide
+                }
+                
+                // Небольшой polygonOffset для предотвращения z-fighting
+                mat.polygonOffset = true
+                mat.polygonOffsetFactor = 1
+                mat.polygonOffsetUnits = 1
+                
+                mat.needsUpdate = true
+              })
             }
           }
         })
         
-        // Если не найдены по имени, пробуем найти по иерархии
         if (!modelBottom || !modelTop) {
           console.warn('Коллекции не найдены по имени, пробуем поиск по иерархии...')
           findCollectionsByHierarchy()
         }
         
-        // Финальная проверка
         if (modelBottom) {
           console.log('✓ Bottom коллекция готова:', modelBottom.name)
         } else {
@@ -537,7 +728,6 @@ const add3DModel = () => {
           console.error('✗ Top коллекция не найдена!')
         }
         
-        // Применяем HDR environment map к материалам окон
         if (environmentMap) {
           console.log('🎨 Применяем HDR environment map к материалам модели')
           updateModelMaterials(environmentMap)
@@ -546,49 +736,42 @@ const add3DModel = () => {
           updateModelMaterials(threeBox.scene.environment)
         }
         
-        // Улучшаем материалы
         enhanceModelMaterials(model)
         
-        // Добавляем модель в сцену
         console.log('➕ Добавляем модель в сцену...')
         threeBox.add(model)
         model.setCoords(origin)
         console.log('✓ Модель добавлена в сцену')
-
-        // Добавляем плоскость земли для теней (опционально)
-        addGroundPlane()
         
-        // Добавляем обработчик клика на модель
-        model.addTooltip = function() {} // Отключаем стандартный тултип
-        
-        // Устанавливаем, что модель кликабельна
+        model.addTooltip = function() {}
         model.userData.selectEnabled = true
         
-        // Привязываем обработчики
         handleModelClick = onModelClick
         handleMouseMove = onModelHover
         
-        // Добавляем обработчики на карту
         mapBoxGl.on('click', handleModelClick)
         mapBoxGl.on('mousemove', handleMouseMove)
+
+        setTimeout(() => {
+          // addGroundPlane()
+        }, 100)
         
-        // Скрываем лоадер после загрузки
         setTimeout(() => {
           isModelLoading.value = false
-          
-          // Отключаем обновление позиции лоадера
           mapBoxGl.off('move', updateLoaderPosition)
           mapBoxGl.off('zoom', updateLoaderPosition)
         }, 500)
         
+        if (threeBox.renderer && threeBox.renderer.shadowMap) {
+          threeBox.renderer.shadowMap.needsUpdate = true
+        }
+        
         mapBoxGl.triggerRepaint()
         
-        console.log('✓ Модель успешно загружена и добавлена в сцену')
+        console.log('✓ Модель успешно загружена и оптимизирована')
       } else {
         console.error('✗ Не удалось загрузить модель')
         isModelLoading.value = false
-        
-        // Отключаем обновление позиции лоадера
         mapBoxGl.off('move', updateLoaderPosition)
         mapBoxGl.off('zoom', updateLoaderPosition)
       }
@@ -596,17 +779,14 @@ const add3DModel = () => {
   } catch (error) {
     console.error('✗ Ошибка при загрузке модели:', error)
     isModelLoading.value = false
-    
-    // Отключаем обновление позиции лоадера
     mapBoxGl.off('move', updateLoaderPosition)
     mapBoxGl.off('zoom', updateLoaderPosition)
   }
 }
+
 const initializeMap = () => {
-  // Mapbox access token
   mapboxgl.accessToken = accessToken
 
-  // Initialize map
   mapBoxGl = new mapboxgl.Map({
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/standard',
@@ -616,159 +796,102 @@ const initializeMap = () => {
     bearing: 0,
     antialias: true,
     scrollZoom: true,
-    dragRotate: false // Отключаем стандартное вращение
+    dragRotate: false
   })
   
-  // Реализуем собственное вращение правой кнопкой мыши с замедленной скоростью
-  const rotateSpeed = 0.5 // Коэффициент замедления (0.12 = очень медленное вращение)
+  // Сохраняем ссылку на canvas
+  canvas = mapBoxGl.getCanvas()
+  
+  // Реализуем собственное вращение правой кнопкой мыши
+  const rotateSpeed = 0.5
   
   let isDragging = false
   let lastX = 0
   let lastY = 0
   
-  mapBoxGl.getCanvas().addEventListener('mousedown', (e) => {
-    if (e.button === 2) { // Правая кнопка мыши
+  // Создаём обработчики как именованные функции
+  mouseDownHandler = (e) => {
+    if (e.button === 2) {
       isDragging = true
       lastX = e.clientX
       lastY = e.clientY
-      mapBoxGl.getCanvas().style.cursor = 'grab'
+      if (canvas) canvas.style.cursor = 'grab'
       e.preventDefault()
     }
-  })
+  }
   
-  mapBoxGl.getCanvas().addEventListener('mousemove', (e) => {
+  mouseMoveHandler = (e) => {
     if (isDragging) {
       const deltaX = e.clientX - lastX
       const deltaY = e.clientY - lastY
       
-      // Инвертированное вращение: мышь вправо = карта вправо, мышь вверх = карта вверх
-      const bearing = mapBoxGl.getBearing() + (deltaX * rotateSpeed)
-      const pitch = mapBoxGl.getPitch() - (deltaY * rotateSpeed * 0.3)
+      const currentBearing = mapBoxGl.getBearing()
+      const currentPitch = mapBoxGl.getPitch()
       
-      mapBoxGl.setBearing(bearing)
-      mapBoxGl.setPitch(Math.max(0, Math.min(85, pitch))) // Ограничиваем pitch
+      mapBoxGl.setBearing(currentBearing + deltaX * rotateSpeed)
+      
+      const newPitch = currentPitch - deltaY * rotateSpeed
+      mapBoxGl.setPitch(Math.max(0, Math.min(85, newPitch)))
       
       lastX = e.clientX
       lastY = e.clientY
-      e.preventDefault()
     }
-  })
+  }
   
-  mapBoxGl.getCanvas().addEventListener('mouseup', (e) => {
+  mouseUpHandler = (e) => {
     if (e.button === 2) {
       isDragging = false
-      mapBoxGl.getCanvas().style.cursor = ''
+      if (canvas) canvas.style.cursor = ''
     }
-  })
+  }
   
-  // Отключаем контекстное меню при правой кнопке мыши
-  mapBoxGl.getCanvas().addEventListener('contextmenu', (e) => {
+  contextMenuHandler = (e) => {
     e.preventDefault()
-  })
+  }
   
-  // Обработчик ресайза для правильного обновления пропорций
-  mapBoxGl.on('resize', () => {
-    if (threeBox && threeBox.renderer) {
-      const canvas = mapBoxGl.getCanvas()
-      threeBox.renderer.setSize(canvas.width, canvas.height)
-    }
-  })
-
-  // Configure map when style loads
-  mapBoxGl.once('style.load', () => {
-    console.log("Стиль карты загружен")
-
-    // Set map environment
-    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'day')
-
-    // Add fog effect for depth
-    mapBoxGl.setFog({
-      'color': 'rgb(186, 210, 235)',
-      'high-color': 'rgb(36, 92, 223)',
-      'horizon-blend': 0.02,
-      'space-color': 'rgb(11, 11, 25)',
-      'star-intensity': 0.6
-    })
-
-    // Add sky layer with realistic atmosphere
-    if (!mapBoxGl.getLayer('sky')) {
-    mapBoxGl.addLayer({
-        'id': 'sky',
-        'type': 'sky',
-        'paint': {
-            'sky-type': 'atmosphere',
-            'sky-atmosphere-sun': [0.0, 85.0],
-            'sky-atmosphere-sun-intensity': 10,
-            'sky-atmosphere-color': 'rgba(135, 206, 235, 1)',
-            'sky-atmosphere-halo-color': 'rgba(255, 255, 255, 0.5)',
-            'sky-gradient-center': [0, 0],
-            'sky-gradient-radius': 90,
-            'sky-gradient': [
-                'interpolate',
-                ['linear'],
-                ['sky-radial-progress'],
-                0.8, 'rgba(135, 206, 235, 1)',
-                1, 'rgba(255, 255, 255, 1)'
-            ],
-            'sky-opacity': [
-                'interpolate',
-                ['exponential', 0.1],
-                ['zoom'],
-                5, 0,
-                6, 1
-            ]
-        }
-    });
-    }
+  // Добавляем обработчики
+  if (canvas) {
+    canvas.addEventListener('mousedown', mouseDownHandler)
+    canvas.addEventListener('mousemove', mouseMoveHandler)
+    canvas.addEventListener('mouseup', mouseUpHandler)
+    canvas.addEventListener('contextmenu', contextMenuHandler)
+  }
+  
+  // Обработчик загрузки карты
+  mapBoxGl.on('load', () => {
+    console.log('Карта загружена')
     
-    // Находим первый symbol layer для вставки 3D слоя перед ним
     const layers = mapBoxGl.getStyle().layers
     let firstSymbolId
-    for (let i = 0; i < layers.length; i++) {
-      if (layers[i].type === 'symbol') {
-        firstSymbolId = layers[i].id
+    for (const layer of layers) {
+      if (layer.type === 'symbol') {
+        firstSymbolId = layer.id
         break
       }
     }
     
-// Проверяем, не существует ли уже слой
-if (!mapBoxGl.getLayer('custom-threebox-layer')) {
-  // Добавляем custom 3D layer ПЕРЕД первым symbol layer
-  mapBoxGl.addLayer({
-    id: 'custom-threebox-layer',
-    type: 'custom',
-    renderingMode: '3d',
-    onAdd: function(map, gl) {
-      add3DModel()
-    },
-    render: function(gl, matrix) {
-      if (threeBox) {
-        // Обновляем позицию света перед рендером
-        updateSunLightPosition()
-        
-        // Обновляем матрицы перед рендером
-        if (model) {
-          model.updateMatrixWorld(true)
+    if (!mapBoxGl.getLayer('custom-threebox-layer')) {
+      mapBoxGl.addLayer({
+        id: 'custom-threebox-layer',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: function(map, gl) {
+          add3DModel()
+        },
+        render: function(gl, matrix) {
+          optimizedRender(gl, matrix)
+        },
+        onRemove: function() {
+          if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId)
+          }
+          if (threeBox) {
+            threeBox.clear()
+          }
         }
-        
-        // Сбрасываем состояние WebGL перед рендером
-        if (threeBox.renderer) {
-          threeBox.renderer.resetState()
-        }
-        
-        threeBox.update()
-        mapBoxGl.triggerRepaint()
-      }
-    },
-    // Добавляем метод onRemove для правильной очистки
-    onRemove: function() {
-      if (threeBox) {
-        threeBox.clear()
-      }
+      }, firstSymbolId)   
+      console.log('Custom 3D layer добавлен с оптимизацией производительности')
     }
-  }, firstSymbolId)   
-  console.log('Custom 3D layer добавлен перед symbol layer:', firstSymbolId)
-}
   })
 }
 
@@ -835,31 +958,19 @@ const onModelHover = (e) => {
   }
 }
 
-// Lifecycle
+// Lifecycle hooks!!!
 onMounted(() => {
+  console.log('Map component mounted')
   initializeMap()
 })
 
+onBeforeUnmount(() => {
+  console.log('Map component будет размонтирован')
+  cleanup()
+})
+
 onUnmounted(() => {
-  // Удаляем обработчики событий
-  if (mapBoxGl) {
-    if (handleModelClick) {
-      mapBoxGl.off('click', handleModelClick)
-    }
-    if (handleMouseMove) {
-      mapBoxGl.off('mousemove', handleMouseMove)
-    }
-    // Удаляем обработчик ресайза
-    mapBoxGl.off('resize')
-  }
-  
-  if (threeBox) {
-    threeBox = null
-  }
-  
-  if (mapBoxGl) {
-    mapBoxGl.remove()
-  }
+  console.log('Map component размонтирован')
 })
 </script>
 
