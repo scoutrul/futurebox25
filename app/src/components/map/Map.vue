@@ -27,7 +27,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/FutureboxNew.glb?url'
+import modelUrl from '@/assets/models/FutureboxNew3.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
@@ -50,7 +50,7 @@ const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJt
 
 // Map variables
 let mapBoxGl = null
-let origin = [37.431054, 55.811968]
+let origin = [37.431174, 55.811868]
 let threeBox = null // Threebox instance
 
 let modelRotation = -278
@@ -181,7 +181,7 @@ const updateModelMaterials = (envMap) => {
           // Настройки для стекла/окон
           if (matName.includes('glass') || matName.includes('window')) {
             mat.envMap = envMap
-            mat.envMapIntensity = 1.0
+            mat.envMapIntensity = 1.2
             // mat.metalness = 0.1
             // mat.roughness = 0.02
           }
@@ -357,8 +357,8 @@ const addFallbackLightingWithSky = async () => {
   sunLight.castShadow = true
   
   // Уменьшаем разрешение теней для производительности
-  sunLight.shadow.mapSize.width = 1024  // Было 8192
-  sunLight.shadow.mapSize.height = 1024 // Было 8192
+  sunLight.shadow.mapSize.width = 2048  // Было 8192
+  sunLight.shadow.mapSize.height = 2048 // Было 8192
   sunLight.shadow.camera.near = 0.5
   sunLight.shadow.camera.far = 500
   
@@ -374,7 +374,7 @@ const addFallbackLightingWithSky = async () => {
   
   scene.add(sunLight)
   
-  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5)
+  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.2)
   scene.add(ambientLight)
   
   console.log('✓ Добавлено оптимизированное освещение')
