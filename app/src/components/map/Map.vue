@@ -860,6 +860,9 @@ const initializeMap = () => {
   // Обработчик загрузки карты
   mapBoxGl.on('load', () => {
     console.log('Карта загружена')
+
+    // Set map environment
+    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'day');
     
     const layers = mapBoxGl.getStyle().layers
     let firstSymbolId
