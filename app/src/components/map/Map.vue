@@ -791,9 +791,9 @@ const initializeMap = () => {
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/standard',
     center: origin,
-    zoom: 16,
-    pitch: 45,
-    bearing: 0,
+    zoom: 17,
+    pitch: 75,
+    bearing: 25,
     antialias: true,
     scrollZoom: true,
     dragRotate: false
