@@ -27,7 +27,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/FutureboxNew3.glb?url'
+import modelUrl from '@/assets/models/FutureboxNew5.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
@@ -103,7 +103,7 @@ const loadEnvironmentMap = () => {
         // НОВОЕ: Уменьшаем масштаб отражения (делаем его более "далеким")
         // Значения больше 1 = отражение становится мельче (более далеким)
         // Значения меньше 1 = отражение становится крупнее (более близким)
-        // texture.repeat.set(8, 8)  // Попробуйте разные значения: 1.5, 2, 3, 4
+        texture.repeat.set(8, 8)  // Попробуйте разные значения: 1.5, 2, 3, 4
         
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
@@ -202,115 +202,7 @@ const updateModelMaterials = (envMap) => {
   
   console.log(`✓ Обновлено ${updatedCount} материалов с environment map`)
 }
-// Оптимизация материалов модели
-const enhanceModelMaterials = (modelObject) => {
-  if (!modelObject) return
-  
-  let meshCount = 0
-  let materialCount = 0
-  
-  modelObject.traverse(child => {
-    if (child.isMesh && child.material) {
-      meshCount++
-      
-      const materials = Array.isArray(child.material) ? child.material : [child.material]
-      
-      materials.forEach(material => {
-        materialCount++
-        
-        // Включаем тени только для важных объектов
-        // child.castShadow = true
-        // child.receiveShadow = true
-        
-        // Оптимизация frustum culling
-        child.frustumCulled = true
-        
-        // КРИТИЧЕСКИ ВАЖНО: Устанавливаем renderOrder для предотвращения мерцания
-        child.renderOrder = 1
-        
-        if (!(material.isMeshStandardMaterial || material.isMeshPhysicalMaterial)) {
-          const originalColor = material.color ? material.color.clone() : new THREE.Color(0xffffff)
-          
-          const newMaterial = new THREE.MeshStandardMaterial({
-            color: originalColor,
-            map: material.map,
-            normalMap: material.normalMap,
-            roughnessMap: material.roughnessMap,
-            metalnessMap: material.metalnessMap,
-            aoMap: material.aoMap,
-            // Оптимизации материала
-            flatShading: false,
-            precision: 'highp', // Высокая точность для предотвращения z-fighting
-            // КРИТИЧЕСКИ ВАЖНО: Настройки depth для предотвращения мерцания
-            depthTest: true,
-            depthWrite: true,
-            // Polygon offset для предотвращения z-fighting
-            polygonOffset: true,
-            polygonOffsetFactor: 1,
-            polygonOffsetUnits: 1
-          })
-          
-          if (Array.isArray(child.material)) {
-            const index = child.material.indexOf(material)
-            child.material[index] = newMaterial
-          } else {
-            child.material = newMaterial
-          }
-          material = newMaterial
-        } else {
-          // КРИТИЧЕСКИ ВАЖНО: Настройки существующих материалов для предотвращения мерцания
-          material.depthTest = true
-          material.depthWrite = true
-          material.precision = 'highp'
-          
-          // Polygon offset для предотвращения z-fighting
-          material.polygonOffset = true
-          material.polygonOffsetFactor = 1
-          material.polygonOffsetUnits = 1
-          
-          // Для прозрачных материалов
-          if (material.transparent || material.opacity < 1) {
-            material.depthWrite = false
-            material.side = THREE.DoubleSide
-            // Увеличиваем polygonOffset для прозрачных материалов
-            material.polygonOffsetFactor = 2
-            material.polygonOffsetUnits = 2
-          }
-        }
-        
-        material.needsUpdate = true
-      })
-    }
-  })
-  
-  console.log(`✓ Оптимизировано ${meshCount} мешей и ${materialCount} материалов`)
-}
-// Оптимизированная функция для добавления плоскости земли
-const addGroundPlane = () => {
-  if (!threeBox || !threeBox.world) return
-  
-  try {
-    // Уменьшаем размер плоскости для оптимизации
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 1, 1) // Убрали сегментацию
-    const groundMaterial = new THREE.ShadowMaterial({
-      opacity: 0.8,
-      color: 0x000000
-    })
-    
-    const groundPlane = new THREE.Mesh(groundGeometry, groundMaterial)
-    groundPlane.rotation.x = -Math.PI / 2
-    groundPlane.receiveShadow = true
-    groundPlane.castShadow = false
-    
-    groundPlane.position.set(0, -0.5, 0)
-    
-    threeBox.world.add(groundPlane)
-    
-    console.log('✓ Добавлена оптимизированная плоскость земли')
-  } catch (error) {
-    console.warn('⚠ Не удалось добавить плоскость земли:', error.message)
-  }
-}
+
 // Оптимизированная функция освещения
 const addFallbackLightingWithSky = async () => {
   if (!threeBox) return
@@ -522,74 +414,15 @@ const cleanup = () => {
   console.log('✓ Очистка ресурсов завершена')
 }
 
-
 // КРИТИЧЕСКИ ВАЖНО: Оптимизированная функция рендеринга без мерцания
 const optimizedRender = (gl, matrix) => {
   if (!threeBox) return
   
-  // ВАЖНО: Сохраняем состояние WebGL перед рендерингом Three.js
-  const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM)
-  const currentBlend = gl.getParameter(gl.BLEND)
-  const currentDepthTest = gl.getParameter(gl.DEPTH_TEST)
-  const currentCullFace = gl.getParameter(gl.CULL_FACE)
-  const currentDepthFunc = gl.getParameter(gl.DEPTH_FUNC)
-  const currentBlendSrc = gl.getParameter(gl.BLEND_SRC_RGB)
-  const currentBlendDst = gl.getParameter(gl.BLEND_DST_RGB)
-  
   // Обновляем позицию света только при необходимости
   updateSunLightPosition()
   
-  // Обновляем матрицы
-  if (model) {
-    model.updateMatrixWorld(true)
-  }
-  
-  // КРИТИЧЕСКИ ВАЖНО: Настраиваем WebGL состояние для Three.js
-  gl.enable(gl.DEPTH_TEST)
-  gl.depthFunc(gl.LEQUAL)
-  gl.enable(gl.BLEND)
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-  
-  // КРИТИЧЕСКИ ВАЖНО: Очищаем только depth buffer, не color buffer
-  // Это предотвращает мерцание при взаимодействии с картой
-  gl.clear(gl.DEPTH_BUFFER_BIT)
-  
   // Рендерим сцену Three.js
   threeBox.update()
-  
-  // ВАЖНО: Восстанавливаем состояние WebGL для Mapbox
-  // Это критично для предотвращения конфликтов рендеринга
-  if (currentProgram) {
-    gl.useProgram(currentProgram)
-  }
-  
-  if (currentBlend) {
-    gl.enable(gl.BLEND)
-  } else {
-    gl.disable(gl.BLEND)
-  }
-  
-  if (currentDepthTest) {
-    gl.enable(gl.DEPTH_TEST)
-  } else {
-    gl.disable(gl.DEPTH_TEST)
-  }
-  
-  if (currentCullFace) {
-    gl.enable(gl.CULL_FACE)
-  } else {
-    gl.disable(gl.CULL_FACE)
-  }
-  
-  // Восстанавливаем функцию глубины
-  if (currentDepthFunc) {
-    gl.depthFunc(currentDepthFunc)
-  }
-  
-  // Восстанавливаем blend функции
-  if (currentBlendSrc && currentBlendDst) {
-    gl.blendFunc(currentBlendSrc, currentBlendDst)
-  }
 }
 // Загрузка и добавление 3D модели
 const add3DModel = () => {
@@ -735,8 +568,6 @@ const add3DModel = () => {
           console.log('🎨 Применяем fallback environment map к материалам модели')
           updateModelMaterials(threeBox.scene.environment)
         }
-        
-        enhanceModelMaterials(model)
         
         console.log('➕ Добавляем модель в сцену...')
         threeBox.add(model)
