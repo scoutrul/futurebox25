@@ -31,6 +31,7 @@ import modelUrl from '@/assets/models/FutureboxNew5.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 
 // Props
@@ -469,6 +470,144 @@ const add3DModel = () => {
   addFallbackLightingWithSky()
   
   console.log('Начинаем загрузку модели...', modelUrl)
+
+  let materialMap = new Map();
+  let combinedCount = 0;
+
+  function fnv1a(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h * 0x01000193) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  // generates a unique hash for each material of type (MeshStandardMaterial or MeshPhysicalMaterial)
+  // hashes will be equal if the materials are interchangeable in appearance (same map / color + same props)
+  let getMaterialHash = (mat) => {
+    if (!mat) return "null";
+
+    const isStandard = mat.isMeshStandardMaterial;
+    const isPhysical = mat.isMeshPhysicalMaterial;
+
+    if (!isStandard && !isPhysical)
+      throw new Error("Material type not supported");
+
+    // serializers
+    const sNum = v => (v ?? 0);
+    const sColor = c => c ? `${c.r},${c.g},${c.b}` : "null";
+    const sVec2 = v => v ? `${v.x},${v.y}` : "null";
+    const sArr = a => a ? a.join(",") : "null";
+
+    const sTexture = (t) => {
+      if (!t) return "null";
+      const img = t.image;
+      const src = img && img.src ? img.src : "";
+      return [
+        src,
+        sVec2(t.offset),
+        sVec2(t.repeat),
+        sNum(t.rotation),
+        t.wrapS, t.wrapT,
+        sNum(t.anisotropy)
+      ].join("|");
+    };
+
+    // list of properties
+    const commonScalarProps = [
+      'roughness','metalness','emissiveIntensity','envMapIntensity',
+      'aoMapIntensity','bumpScale','displacementScale','displacementBias',
+      'lightMapIntensity','wireframeLinewidth','opacity','alphaTest',
+      'polygonOffsetFactor','polygonOffsetUnits'
+    ];
+
+    const commonColorProps = [
+      'color', 'emissive'
+    ];
+
+    const commonVec2Props = [
+      'normalScale'
+    ];
+
+    const commonBoolEnumProps = [
+      'side','flatShading','wireframe','transparent',
+      'depthWrite','depthTest','colorWrite','fog','dithering',
+      'polygonOffset','premultipliedAlpha','toneMapped','blending',
+      'blendSrc','blendDst','blendEquation','blendSrcAlpha',
+      'blendDstAlpha','blendEquationAlpha'
+    ];
+
+    const commonTextureProps = [
+      'map','metalnessMap','roughnessMap','normalMap','aoMap','envMap',
+      'bumpMap','displacementMap','alphaMap','emissiveMap','lightMap'
+    ];
+
+    const physicalScalarProps = [
+      'clearcoat','clearcoatRoughness','sheen','sheenRoughness',
+      'transmission','thickness','attenuationDistance','specularIntensity',
+      'ior','reflectivity','iridescence','iridescenceIOR'
+    ];
+
+    const physicalColorProps = [
+      'sheenColor','attenuationColor','specularColor'
+    ];
+
+    const physicalVec2Props = [
+      'clearcoatNormalScale'
+    ];
+
+    const physicalTextureProps = [
+      'clearcoatMap','clearcoatRoughnessMap','clearcoatNormalMap',
+      'sheenColorMap','sheenRoughnessMap','transmissionMap','thicknessMap',
+      'specularIntensityMap','specularColorMap','iridescenceMap',
+      'iridescenceThicknessMap'
+    ];
+
+    // make single string
+    const out = [];
+
+    out.push(isPhysical ? "PHYSICAL" : "STANDARD");
+
+    for (const p of commonScalarProps)
+      out.push(`${p}:${sNum(mat[p])}`);
+
+    for (const p of commonColorProps)
+      out.push(`${p}:${sColor(mat[p])}`);
+
+    for (const p of commonVec2Props)
+      out.push(`${p}:${sVec2(mat[p])}`);
+
+    for (const p of commonBoolEnumProps)
+      out.push(`${p}:${mat[p]}`);
+
+    for (const p of commonTextureProps)
+      out.push(`${p}:${sTexture(mat[p])}`);
+
+    // additional props for physical only
+    if (isPhysical) {
+      for (const p of physicalScalarProps)
+        out.push(`${p}:${sNum(mat[p])}`);
+
+      for (const p of physicalColorProps)
+        out.push(`${p}:${sColor(mat[p])}`);
+
+      for (const p of physicalVec2Props)
+        out.push(`${p}:${sVec2(mat[p])}`);
+
+      for (const p of physicalTextureProps)
+        out.push(`${p}:${sTexture(mat[p])}`);
+
+      // iridescenceThicknessRange is an array
+      out.push(`iridescenceThicknessRange:${sArr(mat.iridescenceThicknessRange || [])}`);
+    }
+
+    // create combined hash
+    const str = out.join(";");
+    return fnv1a(str);
+  };
+
+  let hashTime = 0;
   
   try {
     threeBox.loadObj({
@@ -488,7 +627,9 @@ const add3DModel = () => {
         console.log('✓ Модель загружена, начинаем оптимизацию...')
         
         model.userData.selectEnabled = false
-        
+
+        model.updateWorldMatrix();
+
         // Ищем и сохраняем ссылки на коллекции bottom и top
         model.traverse((child) => {
           const childName = child.name.toLowerCase()
@@ -520,7 +661,8 @@ const add3DModel = () => {
             
             if (child.material) {
               const materials = Array.isArray(child.material) ? child.material : [child.material]
-              
+
+              let i = 0;
               materials.forEach(mat => {
                 // КРИТИЧЕСКИ ВАЖНО: Настройки материала для предотвращения мерцания
                 mat.depthTest = true
@@ -539,11 +681,82 @@ const add3DModel = () => {
                 mat.polygonOffsetUnits = 1
                 
                 mat.needsUpdate = true
+
+                // group all children / meshes in groups, based on whether their materials are interchangeable
+                // -> make sure to combine materials, which are different material objects, but look the same (e.g. copies in blender)
+                let hashStart = Date.now();
+                let hash = getMaterialHash(mat);
+                let hashEnd = Date.now();
+                hashTime += hashEnd - hashStart;
+
+                let meshGroup;
+                if (materialMap.has(hash)) {
+                  meshGroup = materialMap.get(hash);
+                  combinedCount++;
+                } else {
+                  meshGroup = {
+                    meshes: [],
+                    material: child.material
+                  };
+                  materialMap.set(hash, meshGroup);
+                }
+
+                if (Array.isArray(child.material))
+                  child.material[i] = meshGroup.material;
+                else
+                  child.material = meshGroup.material;
+
+                meshGroup.meshes.push({
+                  mesh: child,
+                  transform: child.matrixWorld
+                });
+
+                i++;
               })
             }
           }
         })
-        
+
+        let startMerge = Date.now();
+        // combine non-unique meshes: merge their geometry into a single object to save on draw calls
+        materialMap.forEach(meshGroup => {
+
+          let geometries = [];
+          meshGroup.meshes.forEach(meshData => {
+            meshData.mesh.parent.remove(meshData.mesh);
+
+            let geom = meshData.mesh.geometry;
+            geom.applyMatrix4(meshData.transform);
+
+            geometries.push(geom);
+          });
+
+          // merge geometries
+          const mergedGeometry = mergeGeometries(geometries, false);
+          if (!mergedGeometry) return;
+
+          let material = meshGroup.material;
+          const mergedMesh = new THREE.Mesh(mergedGeometry, material);
+          mergedMesh.name = `Merged_${material.name || material.uuid}`;
+
+          // no transforms (they are already applied to the geometry of each object)
+          mergedMesh.matrixAutoUpdate = true;
+          mergedMesh.position.set(0, 0, 0);
+          mergedMesh.rotation.set(0, 0, 0);
+          mergedMesh.scale.set(1, 1, 1);
+
+          // add back to model
+          model.add(mergedMesh);
+        });
+
+        let time = Date.now() - startMerge;
+
+        console.log("Mesh Stats: ");
+        console.log("Unique: ", materialMap.size);
+        console.log("Combined: ", combinedCount);
+        console.log("Hashing Took:", hashTime, "ms");
+        console.log("Combining Took:", time, "ms");
+
         if (!modelBottom || !modelTop) {
           console.warn('Коллекции не найдены по имени, пробуем поиск по иерархии...')
           findCollectionsByHierarchy()
@@ -714,6 +927,7 @@ const initializeMap = () => {
         },
         render: function(gl, matrix) {
           optimizedRender(gl, matrix)
+          // console.log(threeBox.renderer.info)
         },
         onRemove: function() {
           if (animationFrameId) {
