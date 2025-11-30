@@ -659,7 +659,7 @@ const add3DModel = () => {
 
             child.castShadow = true
             child.receiveShadow = true
-            child.frustumCulled = true
+            child.frustumCulled = false
             
             if (child.material) {
               const materials = Array.isArray(child.material) ? child.material : [child.material]
@@ -751,7 +751,7 @@ const add3DModel = () => {
             mergedMesh.renderOrder = 1
             mergedMesh.castShadow = true
             mergedMesh.receiveShadow = true
-            mergedMesh.frustumCulled = true
+            mergedMesh.frustumCulled = false
 
             // add back to model
             model.add(mergedMesh);
@@ -858,6 +858,21 @@ const initializeMap = () => {
   // Сохраняем ссылку на canvas
   canvas = mapBoxGl.getCanvas()
   
+  // DEBUG lars
+  // mapBoxGl.showTileBoundaries = true;
+  // mapBoxGl.showTerrainWireframe = true;
+  // mapBoxGl.showOverdrawInspector = true;
+  // mapBoxGl.showPaddingBounds = true;
+  // mapBoxGl.showCollisionBoxes = true;
+
+  setTimeout(() => {
+  mapBoxGl.getStyle().layers
+    .filter(l => l.type === 'symbol')
+    .forEach(l => map.setLayoutProperty(l.id, 'visibility', 'none'));
+    mapBoxGl.setTerrain(null);
+    mapBoxGl.setPaintProperty('building-3d-layer-id', 'fill-extrusion-opacity', 0);
+  }, 5000);
+  
   // Реализуем собственное вращение правой кнопкой мыши
   const rotateSpeed = 0.5
   
@@ -947,10 +962,21 @@ const initializeMap = () => {
               let fps = (1000 / dTime);
               window.cFPS = (window.cFPS * 0.95 + fps * 0.05) || fps;
               console.log("FPS:", fps.toFixed(0), "AVG: ", window.cFPS.toFixed(0));
+              if (fps < 10) {
+                console.log("Slow frame", {
+                      isMoving: mapBoxGl.isMoving(),
+                      isZooming: mapBoxGl.isZooming(),
+                      isRotating: mapBoxGl.isRotating(),
+                      center: mapBoxGl.getCenter(),
+                      pitch: mapBoxGl.getPitch(),
+                      bearing: mapBoxGl.getBearing()
+                    });
+              }
             }
           }
           window.rTime = Date.now();
           // console.log(threeBox.renderer.info)
+          
         },
         onRemove: function() {
           if (animationFrameId) {
@@ -1028,6 +1054,14 @@ const onModelHover = (e) => {
     canvas.style.cursor = ''
   }
 }
+
+setTimeout(() => {
+function animate() {
+  mapBoxGl.triggerRepaint();
+  requestAnimationFrame(animate);
+}
+animate();
+}, 3000);
 
 // Lifecycle hooks!!!
 onMounted(() => {
