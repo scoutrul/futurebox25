@@ -27,7 +27,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/FutureboxNew5.glb?url'
+import modelUrl from '@/assets/models/novator_5.1.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
@@ -50,13 +50,15 @@ const mapContainer = ref(null)
 const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJtMzIwbTdoOHZ5In0.hzXJEVACTihdI_E84Td81w'
 
 const DO_MERGE = true;
+const clipEnabled = true;
 
 // Map variables
 let mapBoxGl = null
-let origin = [37.431174, 55.811868]
+let origin = [56.028131, 54.760180]
+
 let threeBox = null // Threebox instance
 
-let modelRotation = -278
+let modelRotation = 270
 let modelScale = 1
 let model = null
 let modelBottom = null // Reference to bottom collection
@@ -847,9 +849,9 @@ const initializeMap = () => {
     container: mapContainer.value,
     style: 'mapbox://styles/mapbox/standard',
     center: origin,
-    zoom: 17,
-    pitch: 75,
-    bearing: 25,
+    zoom: 17.3,
+    pitch: 45,
+    bearing: -115,
     antialias: true,
     scrollZoom: true,
     dragRotate: false
@@ -870,7 +872,7 @@ const initializeMap = () => {
     .filter(l => l.type === 'symbol')
     .forEach(l => map.setLayoutProperty(l.id, 'visibility', 'none'));
     mapBoxGl.setTerrain(null);
-    mapBoxGl.setPaintProperty('building-3d-layer-id', 'fill-extrusion-opacity', 0);
+    mapBoxGl.setPaintProperty('custom-threebox-layer', 'fill-extrusion-opacity', 0);
   }, 5000);
   
   // Реализуем собственное вращение правой кнопкой мыши
@@ -943,7 +945,35 @@ const initializeMap = () => {
         break
       }
     }
-    
+
+    if (clipEnabled) {
+      mapBoxGl.addSource('clip-polygon-source', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[
+              [56.027, 54.759],  // Юго-западный угол
+              [56.027, 54.762],  // Северо-западный угол
+              [56.030, 54.762],  // Северо-восточный угол
+              [56.030, 54.759],  // Юго-восточный угол
+              [56.027, 54.759]   // Замыкаем полигон
+            ]]
+          }
+        }
+      });
+  
+      mapBoxGl.addLayer({
+        id: 'clip-layer',
+        type: 'clip',
+        source: 'clip-polygon-source',
+        layout: {
+          'clip-layer-types': ['model', 'symbol']
+        }
+      });
+    }
+            
     if (!mapBoxGl.getLayer('custom-threebox-layer')) {
       mapBoxGl.addLayer({
         id: 'custom-threebox-layer',
@@ -1055,13 +1085,13 @@ const onModelHover = (e) => {
   }
 }
 
-setTimeout(() => {
-function animate() {
-  mapBoxGl.triggerRepaint();
-  requestAnimationFrame(animate);
-}
-animate();
-}, 3000);
+// setTimeout(() => {
+// function animate() {
+//   mapBoxGl.triggerRepaint();
+//   requestAnimationFrame(animate);
+// }
+// animate();
+// }, 3000);
 
 // Lifecycle hooks!!!
 onMounted(() => {
