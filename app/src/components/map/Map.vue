@@ -27,7 +27,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/FutureboxNew5.glb?url'
+import modelUrl from '@/assets/models/FutureboxNew6.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
@@ -48,6 +48,8 @@ const { showPanel } = useBuildingPanel()
 // Refs
 const mapContainer = ref(null)
 const accessToken = 'pk.eyJ1IjoidmlydXNyZWxvYWRlZCIsImEiOiJjaXJldTR1cWYwMDEwaWJtMzIwbTdoOHZ5In0.hzXJEVACTihdI_E84Td81w'
+
+const DO_MERGE = true;
 
 // Map variables
 let mapBoxGl = null
@@ -628,7 +630,7 @@ const add3DModel = () => {
         
         model.userData.selectEnabled = false
 
-        model.updateWorldMatrix();
+        model.updateMatrixWorld(true, true);
 
         // Ищем и сохраняем ссылки на коллекции bottom и top
         model.traverse((child) => {
@@ -654,7 +656,7 @@ const add3DModel = () => {
           if (child.isMesh) {
             // Устанавливаем правильный renderOrder
             child.renderOrder = 1
-            
+
             child.castShadow = true
             child.receiveShadow = true
             child.frustumCulled = true
@@ -717,45 +719,55 @@ const add3DModel = () => {
           }
         })
 
-        let startMerge = Date.now();
-        // combine non-unique meshes: merge their geometry into a single object to save on draw calls
-        materialMap.forEach(meshGroup => {
+        if (DO_MERGE) {
+          let startMerge = Date.now();
+          // combine non-unique meshes: merge their geometry into a single object to save on draw calls
+          materialMap.forEach(meshGroup => {
 
-          let geometries = [];
-          meshGroup.meshes.forEach(meshData => {
-            meshData.mesh.parent.remove(meshData.mesh);
+            let geometries = [];
+            meshGroup.meshes.forEach(meshData => {
+              meshData.mesh.parent.remove(meshData.mesh);
 
-            let geom = meshData.mesh.geometry;
-            geom.applyMatrix4(meshData.transform);
+              let geom = meshData.mesh.geometry.clone();
+              geom.applyMatrix4(meshData.transform);
 
-            geometries.push(geom);
+              geometries.push(geom);
+            });
+
+            // merge geometries
+            const mergedGeometry = mergeGeometries(geometries, false);
+            if (!mergedGeometry) return;
+
+            let material = meshGroup.material;
+            const mergedMesh = new THREE.Mesh(mergedGeometry, material);
+            mergedMesh.name = `Merged_${material.name || material.uuid}`;
+
+            // no transforms (they are already applied to the geometry of each object)
+            mergedMesh.matrixAutoUpdate = true;
+            mergedMesh.position.set(0, 0, 0);
+            mergedMesh.rotation.set(0, 0, 0);
+            mergedMesh.scale.set(1, 1, 1);
+
+            mergedMesh.renderOrder = 1
+            mergedMesh.castShadow = true
+            mergedMesh.receiveShadow = true
+            mergedMesh.frustumCulled = true
+
+            // add back to model
+            model.add(mergedMesh);
+
+            mergedMesh.geometry.computeBoundingSphere();
+            mergedMesh.geometry.computeBoundingBox();
           });
 
-          // merge geometries
-          const mergedGeometry = mergeGeometries(geometries, false);
-          if (!mergedGeometry) return;
+          let time = Date.now() - startMerge;
 
-          let material = meshGroup.material;
-          const mergedMesh = new THREE.Mesh(mergedGeometry, material);
-          mergedMesh.name = `Merged_${material.name || material.uuid}`;
-
-          // no transforms (they are already applied to the geometry of each object)
-          mergedMesh.matrixAutoUpdate = true;
-          mergedMesh.position.set(0, 0, 0);
-          mergedMesh.rotation.set(0, 0, 0);
-          mergedMesh.scale.set(1, 1, 1);
-
-          // add back to model
-          model.add(mergedMesh);
-        });
-
-        let time = Date.now() - startMerge;
-
-        console.log("Mesh Stats: ");
-        console.log("Unique: ", materialMap.size);
-        console.log("Combined: ", combinedCount);
-        console.log("Hashing Took:", hashTime, "ms");
-        console.log("Combining Took:", time, "ms");
+          console.log("Mesh Stats: ");
+          console.log("Unique: ", materialMap.size);
+          console.log("Combined: ", combinedCount);
+          console.log("Hashing Took:", hashTime, "ms");
+          console.log("Combining Took:", time, "ms");
+        }
 
         if (!modelBottom || !modelTop) {
           console.warn('Коллекции не найдены по имени, пробуем поиск по иерархии...')
@@ -926,7 +938,18 @@ const initializeMap = () => {
           add3DModel()
         },
         render: function(gl, matrix) {
+
           optimizedRender(gl, matrix)
+
+          if (window.rTime) {
+            let dTime = Date.now() - window.rTime;
+            if (dTime < 300 && dTime > 0) {
+              let fps = (1000 / dTime);
+              window.cFPS = (window.cFPS * 0.95 + fps * 0.05) || fps;
+              console.log("FPS:", fps.toFixed(0), "AVG: ", window.cFPS.toFixed(0));
+            }
+          }
+          window.rTime = Date.now();
           // console.log(threeBox.renderer.info)
         },
         onRemove: function() {
