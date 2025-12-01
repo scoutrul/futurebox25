@@ -27,7 +27,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/novator_5.1.glb?url'
+import modelUrl from '@/assets/models/novator_5.1_V1.glb?url'
 import environmentUrl from '@/assets/tex/environment.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
@@ -108,7 +108,7 @@ const loadEnvironmentMap = () => {
         // НОВОЕ: Уменьшаем масштаб отражения (делаем его более "далеким")
         // Значения больше 1 = отражение становится мельче (более далеким)
         // Значения меньше 1 = отражение становится крупнее (более близким)
-        texture.repeat.set(8, 8)  // Попробуйте разные значения: 1.5, 2, 3, 4
+        // texture.repeat.set(16, 16)  // Попробуйте разные значения: 1.5, 2, 3, 4
         
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
@@ -200,6 +200,7 @@ const updateModelMaterials = (envMap) => {
           else {
             mat.envMapIntensity = 0.5
           }
+
         }
       })
     }
@@ -271,7 +272,7 @@ const addFallbackLightingWithSky = async () => {
   
   scene.add(sunLight)
   
-  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.2)
+  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5)
   scene.add(ambientLight)
   
   console.log('✓ Добавлено оптимизированное освещение')
@@ -935,7 +936,7 @@ const initializeMap = () => {
     console.log('Карта загружена')
 
     // Set map environment
-    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'day');
+    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'dusk');
     
     const layers = mapBoxGl.getStyle().layers
     let firstSymbolId
