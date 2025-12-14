@@ -1,0 +1,31 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@needle-tools/gltf-progressive':
+        specifier: ^3.3.5
+        version: 3.3.5(three@0.181.2)
+
+packages:
+
+  '@needle-tools/gltf-progressive@3.3.5':
+    resolution: {integrity: sha512-n5vLBZ6/RQ/7BMdHSxa72EneSLt39L6TS5/8xeOclEl/pzNP1tl0lewKoVRjj1L5KCJ4T0iOE5fERadALGUqWg==}
+    peerDependencies:
+      three: '>= 0.160.0'
+
+  three@0.181.2:
+    resolution: {integrity: sha512-k/CjiZ80bYss6Qs7/ex1TBlPD11whT9oKfT8oTGiHa34W4JRd1NiH/Tr1DbHWQ2/vMUypxksLnF2CfmlmM5XFQ==}
+
+snapshots:
+
+  '@needle-tools/gltf-progressive@3.3.5(three@0.181.2)':
+    dependencies:
+      three: 0.181.2
+
+  three@0.181.2: {}

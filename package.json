@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@needle-tools/gltf-progressive": "^3.3.5"
+	}
+}

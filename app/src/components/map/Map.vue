@@ -1,12 +1,9 @@
 <template>
   <div class="building-map">
     <!-- Контейнер для карты -->
-    <div
-      id="map"
-      ref="mapContainer"
-      class="map-container"
-    />
-    
+    <div id="map" ref="mapContainer" class="map-container" />
+    <!-- Контролы освещения -->
+    <LightingControls v-if="showLightingControls" v-model="lightingSettings" />
     <!-- Лоадер на время загрузки модели -->
     <div
       v-if="isModelLoading"
@@ -21,19 +18,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Threebox } from 'threebox-plugin'
 import * as THREE from 'three'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import modelUrl from '@/assets/models/novator_5.1_V1.glb?url'
-import environmentUrl from '@/assets/tex/environment.hdr?url'
+import modelUrl from '@/assets/models/novator_5.1_V11.glb?url'
+import environmentUrl from '@/assets/tex/env2.hdr?url'
 import lefortovoImage from '@/assets/img/lefortovo.jpg'
 import { useBuildingPanel } from '@/composables/useBuildingPanel'
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js"
+import LightingControls from './LightingControls.vue'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { useNeedleProgressive } from '@needle-tools/gltf-progressive'
 
-
+// pnpm remove @needle-tools/gltf-progressive
 // Props
 const props = defineProps({
   building: {
@@ -44,6 +44,82 @@ const props = defineProps({
 
 // Используем композицию для управления панелью
 const { showPanel } = useBuildingPanel()
+
+const showLightingControls = ref(true)
+// const lightingSettings = ref({
+//   sun: {
+//     intensity: 1.0,
+//     color: '#ffffff',
+//     position: { x: 50, y: 100, z: 50 }
+//   },
+//   shadow: {
+//     bias: -0.0016,
+//     normalBias: 0.005,
+//     radius: 2
+//   },
+//   ambient: {
+//     intensity: 0.5,
+//     color: '#ffffff'
+//   },
+//   renderer: {
+//     toneMappingExposure: 1.2
+//   },
+//   envMap: {
+//     intensity: 0.0
+//   }
+// })
+const lightingSettings = ref({
+  "sun": {
+    "intensity": 1.2,
+    "color": "#ffffff",
+    "position": {
+      "x": -61,
+      "y": -24,
+      "z": 44
+    }
+  },
+  "shadow": {
+    "bias": -0.0016,
+    "normalBias": 0.005,
+    "radius": 2
+  },
+  "ambient": {
+    "intensity": 0.4,
+    "color": "#ffffff"
+  },
+  "renderer": {
+    "toneMappingExposure": 1.2
+  },
+  "envMap": {
+    "intensity": 1
+  }
+})
+// {
+//   "sun": {
+//     "intensity": 1,
+//     "color": "#ffffff",
+//     "position": {
+//       "x": -61,
+//       "y": -24,
+//       "z": 44
+//     }
+//   },
+//   "shadow": {
+//     "bias": -0.0016,
+//     "normalBias": 0.005,
+//     "radius": 2
+//   },
+//   "ambient": {
+//     "intensity": 0.5,
+//     "color": "#ffffff"
+//   },
+//   "renderer": {
+//     "toneMappingExposure": 1.2
+//   },
+//   "envMap": {
+//     "intensity": 1
+//   }
+// }
 
 // Refs
 const mapContainer = ref(null)
@@ -65,12 +141,8 @@ let modelBottom = null // Reference to bottom collection
 let modelTop = null // Reference to top collection
 let environmentMap = null
 let sunLight = null // Добавляем переменную для света
+let ambientLight = null // Переменная для окружающего света
 
-// Добавьте эти переменные в начало скрипта (после других переменных)
-let animationFrameId = null
-let lastRenderTime = 0
-const targetFPS = 30 // Целевой FPS для оптимизации
-const frameInterval = 1000 // targetFPS
 // Переменные для обработчиков событий
 let canvas = null
 let mouseDownHandler = null
@@ -86,6 +158,81 @@ const loaderPosition = ref({
   transform: 'translate(-50%, -50%)',
   opacity: 0
 })
+
+watch(lightingSettings, (newSettings) => {
+  if (!threeBox || !sunLight || !ambientLight) {
+    console.warn('⚠ Источники света еще не инициализированы')
+    return
+  }
+  
+  console.log('🔄 Обновление настроек освещения...', newSettings)
+  
+  // Обновляем направленный свет (солнце)
+  sunLight.intensity = newSettings.sun.intensity
+  sunLight.color.setStyle(newSettings.sun.color)
+  
+  // ВАЖНО: Обновляем позицию солнца
+  sunLight.position.set(
+    newSettings.sun.position.x,
+    newSettings.sun.position.y,
+    newSettings.sun.position.z
+  )
+  
+  // Обновляем матрицу света
+  sunLight.updateMatrixWorld(true)
+  
+  console.log('☀️ Позиция солнца обновлена:', {
+    x: sunLight.position.x,
+    y: sunLight.position.y,
+    z: sunLight.position.z
+  })
+  
+  // Обновляем тени
+  if (sunLight.shadow) {
+    sunLight.shadow.bias = newSettings.shadow.bias
+    sunLight.shadow.normalBias = newSettings.shadow.normalBias
+    sunLight.shadow.radius = newSettings.shadow.radius
+    sunLight.shadow.camera.updateProjectionMatrix()
+    sunLight.shadow.needsUpdate = true
+  }
+  
+  // Обновляем окружающий свет
+  ambientLight.intensity = newSettings.ambient.intensity
+  ambientLight.color.setStyle(newSettings.ambient.color)
+  
+  // Обновляем настройки рендерера
+  if (threeBox.renderer) {
+    threeBox.renderer.toneMappingExposure = newSettings.renderer.toneMappingExposure
+  }
+  
+  // Обновляем интенсивность environment map ТОЛЬКО для стекла
+  if (model) {
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        materials.forEach(mat => {
+          const matName = mat.name ? mat.name.toLowerCase() : ''
+          // Только для стекла обновляем envMapIntensity
+          if (matName.includes('glass') || matName.includes('window')) {
+            if (mat.envMapIntensity !== undefined) {
+              mat.envMapIntensity = newSettings.envMap.intensity
+              mat.needsUpdate = true
+            }
+          }
+        })
+      }
+    })
+  }
+  
+  // Принудительно обновляем сцену
+  if (threeBox.renderer && threeBox.renderer.shadowMap) {
+    threeBox.renderer.shadowMap.needsUpdate = true
+  }
+  
+  mapBoxGl.triggerRepaint()
+  
+  console.log('✓ Настройки освещения применены')
+}, { deep: true })
 
 const loadEnvironmentMap = () => {
   return new Promise((resolve, reject) => {
@@ -169,6 +316,7 @@ const updateModelMaterials = (envMap) => {
   console.log('🎨 Обновляем материалы модели с environment map')
   
   let updatedCount = 0
+  let glassCount = 0
   
   model.traverse(child => {
     if (child.isMesh && child.material) {
@@ -176,40 +324,30 @@ const updateModelMaterials = (envMap) => {
       
       materials.forEach(mat => {
         if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-          // Применяем envMap ко всем материалам
-          mat.envMap = envMap
-          mat.needsUpdate = true
-          updatedCount++
-          
           const matName = mat.name ? mat.name.toLowerCase() : ''
           
-          // Настройки для стекла/окон
+          // ТОЛЬКО для стекла/окон применяем envMap
           if (matName.includes('glass') || matName.includes('window')) {
             mat.envMap = envMap
-            mat.envMapIntensity = 1.2
-            // mat.metalness = 0.1
-            // mat.roughness = 0.02
+            mat.envMapIntensity = lightingSettings.value.envMap.intensity
+            glassCount++
+            console.log('🪟 EnvMap применена к стеклу:', mat.name)
+          } else {
+            // Для всех остальных материалов УБИРАЕМ envMap
+            mat.envMap = null
+            mat.envMapIntensity = 0
           }
-          // Настройки для металла
-          else if (matName.includes('metal') || matName.includes('aluminum')) {
-            mat.envMapIntensity = 1.0
-            // mat.metalness = 0.8
-            // mat.roughness = 0.2
-          }
-          // Настройки для остальных материалов
-          else {
-            mat.envMapIntensity = 0.5
-          }
-
+          
+          mat.needsUpdate = true
+          updatedCount++
         }
       })
     }
   })
   
-  console.log(`✓ Обновлено ${updatedCount} материалов с environment map`)
+  console.log(`✓ Обновлено ${updatedCount} материалов (${glassCount} стеклянных)`)
 }
 
-// Оптимизированная функция освещения
 const addFallbackLightingWithSky = async () => {
   if (!threeBox) return
   
@@ -224,10 +362,9 @@ const addFallbackLightingWithSky = async () => {
   } catch (error) {
     console.warn('⚠ Не удалось загрузить HDR, используем fallback градиент')
     
-    // Уменьшаем разрешение градиента для оптимизации
     const canvas = document.createElement('canvas')
-    canvas.width = 1024 // Было 2048
-    canvas.height = 512  // Было 1024
+    canvas.width = 1024
+    canvas.height = 512
     const context = canvas.getContext('2d')
     
     const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
@@ -249,47 +386,74 @@ const addFallbackLightingWithSky = async () => {
     console.log('✓ Применено оптимизированное fallback освещение')
   }
   
-  // Оптимизированные настройки света
-  sunLight = new THREE.DirectionalLight(0xffffff, 1.0)
-  sunLight.position.set(50, 100, 50)
+  // Создаем направленный свет (солнце)
+  sunLight = new THREE.DirectionalLight(
+    lightingSettings.value.sun.color,
+    lightingSettings.value.sun.intensity
+  )
+  
+  sunLight.position.set(
+    lightingSettings.value.sun.position.x,
+    lightingSettings.value.sun.position.y,
+    lightingSettings.value.sun.position.z
+  )
+  
   sunLight.castShadow = true
   
-  // Уменьшаем разрешение теней для производительности
-  sunLight.shadow.mapSize.width = 2048  // Было 8192
-  sunLight.shadow.mapSize.height = 2048 // Было 8192
-  sunLight.shadow.camera.near = 0.5
-  sunLight.shadow.camera.far = 500
+  // Настройки теней - увеличены для покрытия большей области
+  sunLight.shadow.mapSize.width = 4096  // Увеличено для лучшего качества
+  sunLight.shadow.mapSize.height = 4096
+  sunLight.shadow.camera.near = 1       // Увеличено с 0.5
+  sunLight.shadow.camera.far = 2000     // Значительно увеличено с 1000
   
-  const shadowSize = 150
+  const shadowSize = 500  // Увеличено с 300 для большей зоны покрытия
   sunLight.shadow.camera.left = -shadowSize
   sunLight.shadow.camera.right = shadowSize
   sunLight.shadow.camera.top = shadowSize
   sunLight.shadow.camera.bottom = -shadowSize
   
-  sunLight.shadow.bias = -0.001
-  sunLight.shadow.normalBias = 0.005
-  sunLight.shadow.radius = 2
+  sunLight.shadow.bias = lightingSettings.value.shadow.bias
+  sunLight.shadow.normalBias = lightingSettings.value.shadow.normalBias
+  sunLight.shadow.radius = lightingSettings.value.shadow.radius
   
+  // ВАЖНО: Добавляем свет и target в сцену
   scene.add(sunLight)
+  scene.add(sunLight.target)
   
-  const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5)
+  // Устанавливаем начальную позицию target
+  sunLight.target.position.set(0, 0, 0)
+  sunLight.target.updateMatrixWorld()
+  
+  console.log('☀️ Направленный свет добавлен на позиции:', sunLight.position)
+  console.log('🎯 Target света на позиции:', sunLight.target.position)
+  
+  // Создаем окружающий свет
+  ambientLight = new THREE.AmbientLight(
+    lightingSettings.value.ambient.color,
+    lightingSettings.value.ambient.intensity
+  )
   scene.add(ambientLight)
+
+  // const hemiLight = new THREE.HemisphereLight(
+  //   0x87ceeb,  // Sky color (light blue)
+  //   0x8b7355,  // Ground color (earth brown)
+  //   1        // Subtle intensity
+  // )
+  // scene.add(hemiLight)
   
   console.log('✓ Добавлено оптимизированное освещение')
   
   if (threeBox.renderer) {
     threeBox.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    threeBox.renderer.toneMappingExposure = 1.2
+    threeBox.renderer.toneMappingExposure = lightingSettings.value.renderer.toneMappingExposure
     threeBox.renderer.outputColorSpace = THREE.SRGBColorSpace
     
-    // Оптимизированные настройки теней
     threeBox.renderer.shadowMap.enabled = true
     threeBox.renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    threeBox.renderer.shadowMap.autoUpdate = false // Отключаем автообновление
+    threeBox.renderer.shadowMap.autoUpdate = false
     
-    // Дополнительные оптимизации рендерера
     threeBox.renderer.powerPreference = 'high-performance'
-    threeBox.renderer.precision = 'mediump' // Средняя точность вместо высокой
+    threeBox.renderer.precision = 'mediump'
     
     console.log('✓ Рендерер оптимизирован для производительности')
   }
@@ -299,29 +463,41 @@ const addFallbackLightingWithSky = async () => {
 const updateSunLightPosition = () => {
   if (!sunLight || !model || !mapBoxGl) return
   
+  // Получаем мировую позицию модели
   const modelWorldPosition = new THREE.Vector3()
   model.getWorldPosition(modelWorldPosition)
   
-  const zoom = mapBoxGl.getZoom()
-  const sceneScale = Math.pow(2, zoom - 16)
+  // Используем настройки из lightingSettings как ОТНОСИТЕЛЬНЫЕ смещения
+  const settings = lightingSettings.value.sun.position
   
-  const baseShadowSize = 150
-  const baseLightDistance = 100
-  
-  const shadowSize = baseShadowSize * sceneScale
-  const lightDistance = baseLightDistance * sceneScale
-  
+  // Применяем смещения относительно модели
   sunLight.position.set(
-    modelWorldPosition.x + lightDistance * 0.5,
-    modelWorldPosition.y + lightDistance,
-    modelWorldPosition.z + lightDistance * 0.5
+    modelWorldPosition.x + settings.x,
+    modelWorldPosition.y + settings.y,
+    modelWorldPosition.z + settings.z
   )
   
+  // Обновляем target - он всегда смотрит на модель
   if (!sunLight.target.parent) {
     threeBox.scene.add(sunLight.target)
   }
   sunLight.target.position.copy(modelWorldPosition)
   sunLight.target.updateMatrixWorld()
+  
+  // Обновляем матрицу света
+  sunLight.updateMatrixWorld(true)
+  
+  // КРИТИЧЕСКИ ВАЖНО: Динамический расчет размера теней на основе зума
+  const zoom = mapBoxGl.getZoom()
+  
+  // Экспоненциальное увеличение размера теней при зуме
+  // При zoom 16 (базовый) = 500
+  // При zoom 17 = 1000
+  // При zoom 18 = 2000
+  // При zoom 19 = 4000
+  const sceneScale = Math.pow(2, zoom - 16)
+  const baseShadowSize = 500  // Базовый размер при zoom 16
+  const shadowSize = baseShadowSize * sceneScale
   
   sunLight.shadow.camera.left = -shadowSize
   sunLight.shadow.camera.right = shadowSize
@@ -330,8 +506,11 @@ const updateSunLightPosition = () => {
   
   const distanceToModel = sunLight.position.distanceTo(modelWorldPosition)
   
-  sunLight.shadow.camera.near = Math.max(1, distanceToModel - shadowSize * 1.5)
-  sunLight.shadow.camera.far = distanceToModel + shadowSize * 1.5
+  // Динамический расчет near и far на основе размера теней
+  // near должен быть достаточно близко, чтобы захватить всю сцену
+  // far должен быть достаточно далеко, чтобы покрыть всю область теней
+  sunLight.shadow.camera.near = Math.max(1, distanceToModel - shadowSize * 3)
+  sunLight.shadow.camera.far = distanceToModel + shadowSize * 3
   
   sunLight.shadow.camera.updateProjectionMatrix()
   
@@ -339,8 +518,8 @@ const updateSunLightPosition = () => {
   if (threeBox.renderer && threeBox.renderer.shadowMap.autoUpdate === false) {
     threeBox.renderer.shadowMap.needsUpdate = true
   }
-}
 
+}
 // Обновление позиции лоадера
 const updateLoaderPosition = () => {
   if (!mapBoxGl) return
@@ -456,21 +635,6 @@ const add3DModel = () => {
       enableTooltips: true
     }
   )
-  
-  // КРИТИЧЕСКИ ВАЖНО: Настройки renderer для предотвращения мерцания
-  if (threeBox.renderer) {
-    threeBox.renderer.autoClear = false
-    threeBox.renderer.sortObjects = true // Включаем сортировку объектов
-    
-    // Настройки для предотвращения z-fighting
-    const gl = threeBox.renderer.getContext()
-    gl.enable(gl.DEPTH_TEST)
-    gl.depthFunc(gl.LEQUAL)
-    
-    // Настройки для правильной работы с прозрачностью
-    threeBox.renderer.sortObjects = true
-    threeBox.renderer.preserveDrawingBuffer = true
-  }
   
   addFallbackLightingWithSky()
   
@@ -637,6 +801,17 @@ const add3DModel = () => {
 
         // Ищем и сохраняем ссылки на коллекции bottom и top
         model.traverse((child) => {
+          // if (child.isMesh && child.geometry) {
+          //   // Compute tangents if the geometry doesn't have them
+          //   if (!child.geometry.attributes.tangent) {
+          //     try {
+          //       child.geometry.computeTangents();
+          //       console.log('✓ Tangents computed for:', child.name || 'unnamed mesh');
+          //     } catch (error) {
+          //       console.warn('⚠ Could not compute tangents for:', child.name || 'unnamed mesh', error.message);
+          //     }
+          //   }
+          // }
           const childName = child.name.toLowerCase()
           
           if (childName.includes('bottom') || 
@@ -841,6 +1016,7 @@ const add3DModel = () => {
     mapBoxGl.off('move', updateLoaderPosition)
     mapBoxGl.off('zoom', updateLoaderPosition)
   }
+  
 }
 
 const initializeMap = () => {
@@ -868,13 +1044,13 @@ const initializeMap = () => {
   // mapBoxGl.showPaddingBounds = true;
   // mapBoxGl.showCollisionBoxes = true;
 
-  setTimeout(() => {
-  mapBoxGl.getStyle().layers
-    .filter(l => l.type === 'symbol')
-    .forEach(l => map.setLayoutProperty(l.id, 'visibility', 'none'));
-    mapBoxGl.setTerrain(null);
-    mapBoxGl.setPaintProperty('custom-threebox-layer', 'fill-extrusion-opacity', 0);
-  }, 5000);
+  // setTimeout(() => {
+  // mapBoxGl.getStyle().layers
+  //   .filter(l => l.type === 'symbol')
+  //   .forEach(l => map.setLayoutProperty(l.id, 'visibility', 'none'));
+  //   mapBoxGl.setTerrain(null);
+  //   mapBoxGl.setPaintProperty('custom-threebox-layer', 'fill-extrusion-opacity', 0);
+  // }, 5000);
   
   // Реализуем собственное вращение правой кнопкой мыши
   const rotateSpeed = 0.5
@@ -936,7 +1112,7 @@ const initializeMap = () => {
     console.log('Карта загружена')
 
     // Set map environment
-    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'dusk');
+    mapBoxGl.setConfigProperty('basemap', 'lightPreset', 'day');
     
     const layers = mapBoxGl.getStyle().layers
     let firstSymbolId
